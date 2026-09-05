@@ -5,308 +5,52 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.graphics.*;
 import android.view.*;
+import android.view.animation.LinearInterpolator;
 import android.widget.*;
 import android.content.Context;
 
 public class MainActivity extends Activity {
     private RoundaboutView roadView;
-
     @Override public void onCreate(Bundle b) {
         super.onCreate(b);
-
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.HORIZONTAL);
-        root.setPadding(18, 18, 18, 18);
-        root.setBackgroundColor(Color.rgb(238, 245, 238));
-
-        roadView = new RoundaboutView(this);
-        root.addView(roadView, new LinearLayout.LayoutParams(0, -1, 3));
-
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(26, 10, 18, 12);
-        scroll.addView(panel);
-        root.addView(scroll, new LinearLayout.LayoutParams(0, -1, 2));
-
-        TextView title = new TextView(this);
-        title.setText("UK ROUNDABOUTS TRAINER  v0.2");
-        title.setTextSize(24);
-        title.setTypeface(null, Typeface.BOLD);
-        panel.addView(title);
-
-        TextView info = new TextView(this);
-        info.setText("Choose an approach and exit, then watch the training car.\nMSPSL: Mirrors • Signal • Position • Speed • Look.");
-        info.setTextSize(16);
-        info.setPadding(0, 14, 0, 18);
-        panel.addView(info);
-
-        panel.addView(label("Approach road"));
-        Spinner approach = spinner(new String[]{"South", "West", "North", "East"});
-        panel.addView(approach);
-
-        panel.addView(label("Exit"));
-        Spinner exit = spinner(new String[]{"1st exit / left", "2nd exit / ahead", "3rd exit / right"});
-        panel.addView(exit);
-
-        CheckBox markings = new CheckBox(this);
-        markings.setText("Show lane markings and arrows");
-        markings.setChecked(true);
-        markings.setTextSize(16);
-        panel.addView(markings);
-
-        Button simulate = new Button(this);
-        simulate.setText("START DRIVING DEMO");
-        simulate.setTextSize(17);
-        panel.addView(simulate);
-
-        TextView advice = new TextView(this);
-        advice.setTextSize(16);
-        advice.setPadding(0, 18, 0, 8);
-        panel.addView(advice);
-
-        TextView tip = new TextView(this);
-        tip.setText("Training guide only. At real roundabouts always follow signs, traffic lights, road markings and local lane arrows. Give priority to traffic from the right unless directed otherwise.");
-        tip.setTextSize(14);
-        tip.setPadding(0, 14, 0, 0);
-        panel.addView(tip);
-
-        Runnable update = () -> {
-            roadView.approach = approach.getSelectedItemPosition();
-            roadView.exit = exit.getSelectedItemPosition() + 1;
-            roadView.showMarkings = markings.isChecked();
-            roadView.resetCar();
-            advice.setText(buildAdvice(roadView.exit));
-        };
-
-        simulate.setOnClickListener(v -> {
-            update.run();
-            roadView.startCar();
-        });
-        markings.setOnClickListener(v -> update.run());
-        approach.setOnItemSelectedListener(simpleSelection(update));
-        exit.setOnItemSelectedListener(simpleSelection(update));
-        advice.setText(buildAdvice(2));
-
-        setContentView(root);
+        LinearLayout root=new LinearLayout(this); root.setOrientation(LinearLayout.HORIZONTAL); root.setPadding(14,14,14,14); root.setBackgroundColor(Color.rgb(238,245,238));
+        roadView=new RoundaboutView(this); root.addView(roadView,new LinearLayout.LayoutParams(0,-1,3));
+        ScrollView scroll=new ScrollView(this); LinearLayout panel=new LinearLayout(this); panel.setOrientation(LinearLayout.VERTICAL); panel.setPadding(24,8,18,14); scroll.addView(panel); root.addView(scroll,new LinearLayout.LayoutParams(0,-1,2));
+        TextView title=text("UK ROUNDABOUTS TRAINER  v0.3",24,true); panel.addView(title);
+        TextView info=text("Full training sequence: Mirrors • Signal • Position • Speed • Look",15,false); info.setPadding(0,10,0,14); panel.addView(info);
+        panel.addView(text("Approach road",16,true)); Spinner approach=spinner(new String[]{"South","West","North","East"}); panel.addView(approach);
+        panel.addView(text("Exit",16,true)); Spinner exit=spinner(new String[]{"1st exit / left","2nd exit / ahead","3rd exit / right"}); panel.addView(exit);
+        CheckBox markings=new CheckBox(this); markings.setText("Show markings, arrows and training route"); markings.setChecked(true); panel.addView(markings);
+        Button simulate=new Button(this); simulate.setText("START FULL DRIVING DEMO"); panel.addView(simulate);
+        TextView stage=text("Ready • MIRRORS",18,true); stage.setPadding(0,16,0,6); panel.addView(stage);
+        ProgressBar progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal); progress.setMax(100); panel.addView(progress,new LinearLayout.LayoutParams(-1,18));
+        TextView advice=text("",15,false); advice.setPadding(0,14,0,8); panel.addView(advice);
+        TextView features=text("Demo: slows and pauses at GIVE WAY • flashes the correct indicator • changes to LEFT before exit • highlights suggested route/lane.",14,false); features.setPadding(0,10,0,8); panel.addView(features);
+        TextView tip=text("Training guide only. Always follow signs, traffic lights, road markings and local lane arrows. Give priority to traffic from the right unless directed otherwise.",13,false); panel.addView(tip);
+        roadView.listener=(s,v)->{stage.setText(s);progress.setProgress(v);};
+        Runnable update=()->{roadView.approach=approach.getSelectedItemPosition();roadView.exit=exit.getSelectedItemPosition()+1;roadView.showMarkings=markings.isChecked();roadView.resetCar();advice.setText(advice(roadView.exit));stage.setText("Ready • MIRRORS");progress.setProgress(0);};
+        simulate.setOnClickListener(v->{update.run();roadView.startCar();}); markings.setOnClickListener(v->update.run()); approach.setOnItemSelectedListener(selection(update)); exit.setOnItemSelectedListener(selection(update)); advice.setText(advice(1)); setContentView(root);
     }
+    private TextView text(String s,int size,boolean bold){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);if(bold)v.setTypeface(null,Typeface.BOLD);return v;}
+    private Spinner spinner(String[] a){Spinner s=new Spinner(this);s.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,a));return s;}
+    private AdapterView.OnItemSelectedListener selection(Runnable r){return new AdapterView.OnItemSelectedListener(){public void onItemSelected(AdapterView<?>p,View v,int x,long id){r.run();}public void onNothingSelected(AdapterView<?>p){}};}
+    private String advice(int e){if(e==1)return "1st exit / LEFT\n1 MIRRORS before slowing\n2 SIGNAL left on approach\n3 POSITION normally left lane unless markings say otherwise\n4 SPEED down and prepare to stop\n5 LOOK right; enter when safe and leave at first exit";if(e==2)return "2nd exit / AHEAD\n1 MIRRORS first\n2 SIGNAL usually none on approach\n3 POSITION follow lane arrows; normally left if unmarked\n4 SPEED down and assess traffic\n5 LOOK right; signal LEFT after passing the exit before yours";return "3rd exit / RIGHT\n1 MIRRORS first\n2 SIGNAL right on approach\n3 POSITION normally right lane unless markings say otherwise\n4 SPEED down and prepare to stop\n5 LOOK right; use inner lane, then move outward safely and signal LEFT before leaving";}
+    interface StageListener{void stage(String s,int p);}
 
-    private AdapterView.OnItemSelectedListener simpleSelection(Runnable r) {
-        return new AdapterView.OnItemSelectedListener() {
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { r.run(); }
-            public void onNothingSelected(AdapterView<?> parent) { }
-        };
-    }
-
-    private String buildAdvice(int exit) {
-        if (exit == 1) {
-            return "1st exit / LEFT\n• Mirrors before changing speed or position\n• Signal LEFT on approach\n• Normally approach in the LEFT lane unless signs/markings say otherwise\n• Keep to the outer lane and leave at the first exit";
-        }
-        if (exit == 2) {
-            return "2nd exit / AHEAD\n• Mirrors first\n• Usually NO signal on approach\n• Follow lane arrows; normally use the left lane when no markings indicate otherwise\n• Signal LEFT after passing the exit before yours";
-        }
-        return "3rd exit / RIGHT\n• Mirrors first\n• Signal RIGHT on approach\n• Normally approach in the RIGHT lane unless signs/markings say otherwise\n• Use the inner lane, then move outward when safe and signal LEFT before leaving";
-    }
-
-    private TextView label(String s) {
-        TextView v = new TextView(this);
-        v.setText(s);
-        v.setTextSize(17);
-        v.setTypeface(null, Typeface.BOLD);
-        v.setPadding(0, 10, 0, 5);
-        return v;
-    }
-
-    private Spinner spinner(String[] values) {
-        Spinner s = new Spinner(this);
-        s.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, values));
-        return s;
-    }
-
-    static class RoundaboutView extends View {
-        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint routePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        int approach = 0;
-        int exit = 2;
-        boolean showMarkings = true;
-        private float carProgress = 0f;
-        private ValueAnimator animator;
-        private Path route = new Path();
-
-        RoundaboutView(Context c) {
-            super(c);
-            routePaint.setColor(Color.rgb(255, 210, 0));
-            routePaint.setStyle(Paint.Style.STROKE);
-            routePaint.setStrokeWidth(9);
-            routePaint.setStrokeCap(Paint.Cap.ROUND);
-        }
-
-        void resetCar() {
-            if (animator != null) animator.cancel();
-            carProgress = 0f;
-            invalidate();
-        }
-
-        void startCar() {
-            if (getWidth() == 0 || getHeight() == 0) return;
-            if (animator != null) animator.cancel();
-            carProgress = 0f;
-            animator = ValueAnimator.ofFloat(0f, 1f);
-            animator.setDuration(5200);
-            animator.addUpdateListener(a -> {
-                carProgress = (float) a.getAnimatedValue();
-                invalidate();
-            });
-            animator.start();
-        }
-
-        @Override protected void onDraw(Canvas c) {
-            super.onDraw(c);
-            float w = getWidth(), h = getHeight();
-            float cx = w / 2f, cy = h / 2f;
-            float r = Math.min(w, h) * 0.215f;
-            float roadWidth = r * 0.98f;
-            float lane = roadWidth / 4f;
-
-            c.drawColor(Color.rgb(82, 145, 78));
-
-            p.setColor(Color.rgb(60, 60, 60));
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(roadWidth);
-            c.drawCircle(cx, cy, r, p);
-
-            p.setStyle(Paint.Style.FILL);
-            c.drawRect(cx - roadWidth / 2, cy + r, cx + roadWidth / 2, h, p);
-            c.drawRect(cx - roadWidth / 2, 0, cx + roadWidth / 2, cy - r, p);
-            c.drawRect(0, cy - roadWidth / 2, cx - r, cy + roadWidth / 2, p);
-            c.drawRect(cx + r, cy - roadWidth / 2, w, cy + roadWidth / 2, p);
-
-            p.setColor(Color.rgb(67, 125, 62));
-            p.setStyle(Paint.Style.FILL);
-            c.drawCircle(cx, cy, r - roadWidth * 0.54f, p);
-
-            if (showMarkings) drawMarkings(c, cx, cy, r, roadWidth, w, h);
-
-            c.save();
-            c.rotate(approach * 90f, cx, cy);
-            route = buildRoute(cx, cy, r, roadWidth, w, h, exit);
-            c.drawPath(route, routePaint);
-            drawGiveWay(c, cx, cy + r + roadWidth * 0.31f, roadWidth);
-            drawLaneArrows(c, cx, cy, r, roadWidth, h);
-            drawCar(c, route, carProgress, lane);
-            c.restore();
-
-            p.setStyle(Paint.Style.FILL);
-            p.setColor(Color.WHITE);
-            p.setTextSize(22);
-            p.setTypeface(Typeface.DEFAULT_BOLD);
-            c.drawText("UK • CLOCKWISE", 16, 31, p);
-        }
-
-        private Path buildRoute(float cx, float cy, float r, float roadWidth, float w, float h, int chosenExit) {
-            Path path = new Path();
-            float entryX = cx - roadWidth * 0.23f; // left side of the south approach when travelling north
-            float outerR = r + roadWidth * 0.20f;
-            float innerR = r - roadWidth * 0.20f;
-            float useR = chosenExit == 3 ? innerR : outerR;
-
-            path.moveTo(entryX, h + 10);
-            path.lineTo(entryX, cy + useR + roadWidth * 0.25f);
-            path.quadTo(entryX, cy + useR, cx, cy + useR);
-
-            RectF oval = new RectF(cx - useR, cy - useR, cx + useR, cy + useR);
-            path.arcTo(oval, 90f, chosenExit * 90f);
-
-            float outOffset = roadWidth * 0.23f;
-            if (chosenExit == 1) {
-                path.quadTo(cx - useR, cy + outOffset, cx - useR - roadWidth * 0.2f, cy + outOffset);
-                path.lineTo(-10, cy + outOffset);
-            } else if (chosenExit == 2) {
-                path.quadTo(cx - outOffset, cy - useR, cx - outOffset, cy - useR - roadWidth * 0.2f);
-                path.lineTo(cx - outOffset, -10);
-            } else {
-                path.quadTo(cx + useR, cy - outOffset, cx + useR + roadWidth * 0.2f, cy - outOffset);
-                path.lineTo(w + 10, cy - outOffset);
-            }
-            return path;
-        }
-
-        private void drawMarkings(Canvas c, float cx, float cy, float r, float roadWidth, float w, float h) {
-            p.setColor(Color.WHITE);
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(3.5f);
-            p.setPathEffect(new DashPathEffect(new float[]{17, 15}, 0));
-            c.drawCircle(cx, cy, r, p);
-            c.drawLine(cx, cy + r + 5, cx, h, p);
-            c.drawLine(cx, 0, cx, cy - r - 5, p);
-            c.drawLine(0, cy, cx - r - 5, cy, p);
-            c.drawLine(cx + r + 5, cy, w, cy, p);
-            p.setPathEffect(null);
-        }
-
-        private void drawGiveWay(Canvas c, float cx, float y, float roadWidth) {
-            p.setColor(Color.WHITE);
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(5);
-            p.setPathEffect(new DashPathEffect(new float[]{14, 9}, 0));
-            c.drawLine(cx - roadWidth * 0.47f, y, cx + roadWidth * 0.47f, y, p);
-            p.setPathEffect(null);
-        }
-
-        private void drawLaneArrows(Canvas c, float cx, float cy, float r, float roadWidth, float h) {
-            p.setColor(Color.WHITE);
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(5);
-            p.setStrokeCap(Paint.Cap.SQUARE);
-            float y = Math.min(h - 65, cy + r + roadWidth * 0.95f);
-            float leftX = cx - roadWidth * 0.24f;
-            float rightX = cx + roadWidth * 0.24f;
-            drawArrow(c, leftX, y, -90, true);
-            drawArrow(c, rightX, y, -90, false);
-        }
-
-        private void drawArrow(Canvas c, float x, float y, float angle, boolean leftChoice) {
-            c.save();
-            c.rotate(angle, x, y);
-            c.drawLine(x - 22, y, x + 24, y, p);
-            c.drawLine(x + 24, y, x + 10, y - 12, p);
-            c.drawLine(x + 24, y, x + 10, y + 12, p);
-            if (leftChoice) {
-                c.drawLine(x, y, x, y - 25, p);
-                c.drawLine(x, y - 25, x - 10, y - 14, p);
-            } else {
-                c.drawLine(x, y, x, y + 25, p);
-                c.drawLine(x, y + 25, x - 10, y + 14, p);
-            }
-            c.restore();
-        }
-
-        private void drawCar(Canvas c, Path path, float progress, float lane) {
-            PathMeasure pm = new PathMeasure(path, false);
-            float distance = pm.getLength() * progress;
-            float[] pos = new float[2];
-            float[] tan = new float[2];
-            if (!pm.getPosTan(distance, pos, tan)) return;
-            float angle = (float)Math.toDegrees(Math.atan2(tan[1], tan[0]));
-
-            c.save();
-            c.translate(pos[0], pos[1]);
-            c.rotate(angle);
-            float carL = lane * 0.75f;
-            float carW = lane * 0.42f;
-            p.setStyle(Paint.Style.FILL);
-            p.setColor(Color.rgb(40, 120, 220));
-            c.drawRoundRect(-carL/2, -carW/2, carL/2, carW/2, 8, 8, p);
-            p.setColor(Color.rgb(185, 225, 255));
-            c.drawRect(-carL*0.12f, -carW*0.38f, carL*0.20f, carW*0.38f, p);
-            p.setColor(Color.WHITE);
-            Path nose = new Path();
-            nose.moveTo(carL/2 + 7, 0);
-            nose.lineTo(carL/2 - 5, -7);
-            nose.lineTo(carL/2 - 5, 7);
-            nose.close();
-            c.drawPath(nose, p);
-            c.restore();
-        }
+    static class RoundaboutView extends View{
+        Paint p=new Paint(Paint.ANTI_ALIAS_FLAG), routePaint=new Paint(Paint.ANTI_ALIAS_FLAG), glow=new Paint(Paint.ANTI_ALIAS_FLAG); int approach=0,exit=1; boolean showMarkings=true; float carProgress=0,raw=0; ValueAnimator animator; Path route=new Path(); StageListener listener;
+        RoundaboutView(Context c){super(c);routePaint.setColor(Color.rgb(255,205,0));routePaint.setStyle(Paint.Style.STROKE);routePaint.setStrokeWidth(8);routePaint.setStrokeCap(Paint.Cap.ROUND);glow.setColor(Color.argb(65,70,170,255));glow.setStyle(Paint.Style.STROKE);glow.setStrokeWidth(38);glow.setStrokeCap(Paint.Cap.ROUND);}
+        void resetCar(){if(animator!=null)animator.cancel();carProgress=raw=0;invalidate();}
+        void startCar(){if(getWidth()==0)return;if(animator!=null)animator.cancel();animator=ValueAnimator.ofFloat(0,1);animator.setDuration(7600);animator.setInterpolator(new LinearInterpolator());animator.addUpdateListener(a->{raw=(float)a.getAnimatedValue();if(raw<.24f)carProgress=raw/.24f*.19f;else if(raw<.37f)carProgress=.19f;else carProgress=.19f+(raw-.37f)/.63f*.81f;report();invalidate();});animator.start();}
+        void report(){if(listener==null)return;String s;if(raw<.1)s="1/5 • MIRRORS — check before slowing";else if(raw<.2)s=exit==1?"2/5 • SIGNAL — LEFT":exit==3?"2/5 • SIGNAL — RIGHT":"2/5 • SIGNAL — normally none";else if(raw<.28)s="3/5 • POSITION — correct lane";else if(raw<.37)s="4/5 • SPEED — pause at GIVE WAY";else if(raw<.48)s="5/5 • LOOK RIGHT — enter when safe";else if(raw<.78)s="ON ROUNDABOUT • observe and hold lane";else if(raw<.96)s="EXIT • SIGNAL LEFT + mirrors";else s="COMPLETE • safe exit";listener.stage(s,Math.round(raw*100));}
+        @Override protected void onDraw(Canvas c){float w=getWidth(),h=getHeight(),cx=w/2,cy=h/2,r=Math.min(w,h)*.215f,rw=r*1.02f,lane=rw/4;c.drawColor(Color.rgb(77,142,74));road(c,cx,cy,r,rw,w,h);if(showMarkings)markings(c,cx,cy,r,rw,w,h);c.save();c.rotate(approach*90,cx,cy);route=route(cx,cy,r,rw,w,h,exit);c.drawPath(route,glow);if(showMarkings){c.drawPath(route,routePaint);giveWay(c,cx,cy+r+rw*.32f,rw);arrows(c,cx,cy,r,rw,h);}car(c,route,carProgress,lane);c.restore();p.setStyle(Paint.Style.FILL);p.setColor(Color.WHITE);p.setTextSize(21);p.setTypeface(Typeface.DEFAULT_BOLD);c.drawText("UK • CLOCKWISE",14,29,p);}
+        void road(Canvas c,float cx,float cy,float r,float rw,float w,float h){p.setColor(Color.rgb(57,57,57));p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(rw);c.drawCircle(cx,cy,r,p);p.setStyle(Paint.Style.FILL);c.drawRect(cx-rw/2,cy+r,cx+rw/2,h,p);c.drawRect(cx-rw/2,0,cx+rw/2,cy-r,p);c.drawRect(0,cy-rw/2,cx-r,cy+rw/2,p);c.drawRect(cx+r,cy-rw/2,w,cy+rw/2,p);p.setColor(Color.rgb(63,120,59));c.drawCircle(cx,cy,r-rw*.54f,p);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(6);p.setColor(Color.rgb(92,155,84));c.drawCircle(cx,cy,r-rw*.54f,p);}
+        Path route(float cx,float cy,float r,float rw,float w,float h,int e){Path q=new Path();float ex=e==3?cx+rw*.23f:cx-rw*.23f,rr=e==3?r-rw*.20f:r+rw*.20f;q.moveTo(ex,h+10);q.lineTo(ex,cy+rr+rw*.28f);q.quadTo(ex,cy+rr,cx,cy+rr);q.arcTo(new RectF(cx-rr,cy-rr,cx+rr,cy+rr),90,e*90);float o=rw*.23f;if(e==1){q.quadTo(cx-rr,cy+o,cx-rr-rw*.2f,cy+o);q.lineTo(-10,cy+o);}else if(e==2){q.quadTo(cx-o,cy-rr,cx-o,cy-rr-rw*.2f);q.lineTo(cx-o,-10);}else{q.quadTo(cx+rr,cy-o,cx+rr+rw*.2f,cy-o);q.lineTo(w+10,cy-o);}return q;}
+        void markings(Canvas c,float cx,float cy,float r,float rw,float w,float h){p.setStyle(Paint.Style.STROKE);p.setColor(Color.WHITE);p.setStrokeWidth(3.5f);p.setPathEffect(new DashPathEffect(new float[]{17,14},0));c.drawCircle(cx,cy,r,p);c.drawLine(cx,cy+r+5,cx,h,p);c.drawLine(cx,0,cx,cy-r-5,p);c.drawLine(0,cy,cx-r-5,cy,p);c.drawLine(cx+r+5,cy,w,cy,p);p.setPathEffect(null);}
+        void giveWay(Canvas c,float cx,float y,float rw){p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(5);p.setPathEffect(new DashPathEffect(new float[]{13,8},0));c.drawLine(cx-rw*.47f,y,cx+rw*.47f,y,p);p.setPathEffect(null);p.setStyle(Paint.Style.FILL);for(int i=-1;i<=1;i+=2){float x=cx+i*rw*.23f;Path t=new Path();t.moveTo(x,y+20);t.lineTo(x-11,y+40);t.lineTo(x+11,y+40);t.close();c.drawPath(t,p);}}
+        void arrows(Canvas c,float cx,float cy,float r,float rw,float h){p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(5);float y=Math.min(h-70,cy+r+rw*.95f);arrow(c,cx-rw*.24f,y,true);arrow(c,cx+rw*.24f,y,false);}
+        void arrow(Canvas c,float x,float y,boolean left){c.drawLine(x,y+24,x,y-24,p);c.drawLine(x,y-24,x-10,y-10,p);c.drawLine(x,y-24,x+10,y-10,p);float d=left?-22:22;c.drawLine(x,y,x+d,y,p);c.drawLine(x+d,y,x+d-(left?-10:10),y-10,p);c.drawLine(x+d,y,x+d-(left?-10:10),y+10,p);}
+        void car(Canvas c,Path q,float f,float lane){PathMeasure pm=new PathMeasure(q,false);float[] pos=new float[2],tan=new float[2];if(!pm.getPosTan(pm.getLength()*f,pos,tan))return;float a=(float)Math.toDegrees(Math.atan2(tan[1],tan[0]));c.save();c.translate(pos[0],pos[1]);c.rotate(a);float l=Math.max(42,lane*.82f),ww=Math.max(24,lane*.46f);p.setStyle(Paint.Style.FILL);p.setColor(Color.rgb(35,105,210));c.drawRoundRect(-l/2,-ww/2,l/2,ww/2,9,9,p);p.setColor(Color.rgb(180,225,255));c.drawRoundRect(-l*.1f,-ww*.38f,l*.2f,ww*.38f,4,4,p);p.setColor(Color.rgb(25,25,25));c.drawRect(-l*.3f,-ww*.57f,-l*.08f,-ww*.48f,p);c.drawRect(-l*.3f,ww*.48f,-l*.08f,ww*.57f,p);c.drawRect(l*.12f,-ww*.57f,l*.34f,-ww*.48f,p);c.drawRect(l*.12f,ww*.48f,l*.34f,ww*.57f,p);boolean blink=((System.currentTimeMillis()/350)%2)==0;int sig=signal();if(blink&&sig!=0){p.setColor(Color.rgb(255,170,0));float sx=l/2-4,sy=ww/2-4;if(sig<0)c.drawCircle(sx,-sy,5,p);else c.drawCircle(sx,sy,5,p);}p.setColor(Color.WHITE);c.drawCircle(l/2-4,-ww*.22f,3.5f,p);c.drawCircle(l/2-4,ww*.22f,3.5f,p);c.restore();}
+        int signal(){if(exit==1)return-1;if(exit==2)return raw>.72f?-1:0;return raw<.72f?1:-1;}
     }
 }
