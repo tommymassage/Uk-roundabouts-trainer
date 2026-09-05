@@ -1,0 +1,16 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'uk.co.roundaboutstrainer'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'uk.co.roundaboutstrainer'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0'
+    }
+}
