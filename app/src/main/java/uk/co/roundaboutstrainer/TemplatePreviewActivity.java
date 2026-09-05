@@ -9,6 +9,7 @@ import android.view.Gravity;
 import android.view.animation.LinearInterpolator;
 import android.widget.*;
 import android.content.Context;
+import android.widget.AdapterView;
 
 public class TemplatePreviewActivity extends Activity {
     @Override public void onCreate(Bundle b) {
@@ -19,9 +20,11 @@ public class TemplatePreviewActivity extends Activity {
         root.setBackgroundColor(Color.rgb(238, 243, 247));
 
         FrameLayout boardStack = new FrameLayout(this);
+        boardStack.setBackgroundColor(Color.BLACK);
+
         ImageView board = new ImageView(this);
         board.setImageResource(R.drawable.roundabout_template);
-        board.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        board.setScaleType(ImageView.ScaleType.FIT_CENTER);
         boardStack.addView(board, new FrameLayout.LayoutParams(-1, -1));
 
         TrainingOverlay overlay = new TrainingOverlay(this);
@@ -35,18 +38,31 @@ public class TemplatePreviewActivity extends Activity {
         root.addView(panel, new LinearLayout.LayoutParams(0, -1, 2));
 
         TextView title = new TextView(this);
-        title.setText("UK ROUNDABOUTS TRAINER  v0.7.2");
+        title.setText("UK ROUNDABOUTS TRAINER  v0.7.3");
         title.setTextSize(25);
         title.setTextColor(Color.rgb(25, 35, 45));
         title.setTypeface(null, 1);
         panel.addView(title);
 
         TextView status = new TextView(this);
-        status.setText("IMAGE TEMPLATE + LIVE OVERLAY TEST\n\nThe roundabout is the background layer. The green route and blue training car are separate live layers drawn on top.\n\nThis proves we can preserve the artwork while keeping cars, routes and training logic interactive.");
+        status.setText("PRESERVED IMAGE TEMPLATE + CALIBRATED LIVE LAYERS\n\nThe roundabout artwork stays unchanged. The route and training car are separate interactive layers aligned to the square image area.");
         status.setTextSize(16);
         status.setTextColor(Color.rgb(35, 45, 55));
-        status.setPadding(0, 20, 0, 18);
+        status.setPadding(0, 18, 0, 16);
         panel.addView(status);
+
+        TextView exitLabel = new TextView(this);
+        exitLabel.setText("Exit from South approach");
+        exitLabel.setTextSize(14);
+        exitLabel.setTypeface(null, 1);
+        panel.addView(exitLabel);
+
+        Spinner exit = new Spinner(this);
+        exit.setAdapter(new ArrayAdapter<String>(this,
+                android.R.layout.simple_spinner_dropdown_item,
+                new String[]{"1st exit / left", "2nd exit / ahead", "3rd exit / right"}));
+        exit.setSelection(1);
+        panel.addView(exit);
 
         CheckBox routeToggle = new CheckBox(this);
         routeToggle.setText("Show route overlay");
@@ -59,14 +75,22 @@ public class TemplatePreviewActivity extends Activity {
         panel.addView(carToggle);
 
         Button start = new Button(this);
-        start.setText("▶  START OVERLAY DEMO");
+        start.setText("▶  START DRIVING DEMO");
         panel.addView(start, new LinearLayout.LayoutParams(-1, 60));
 
         TextView note = new TextView(this);
-        note.setText("Next: replace the temporary resource with the full artwork, then calibrate the path to the exact lane geometry.");
+        note.setText("Template is now a permanent project resource. Next we can fine-tune lane positions and add other traffic without redrawing the roundabout.");
         note.setTextSize(14);
         note.setPadding(0, 18, 0, 0);
         panel.addView(note);
+
+        exit.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                overlay.exit = position + 1;
+                overlay.reset();
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) { }
+        });
 
         routeToggle.setOnCheckedChangeListener((button, checked) -> {
             overlay.showRoute = checked;
@@ -90,35 +114,42 @@ public class TemplatePreviewActivity extends Activity {
         private final PathMeasure measure = new PathMeasure();
         private final float[] pos = new float[2];
         private final float[] tan = new float[2];
+
         boolean showRoute = true;
         boolean showCar = true;
+        int exit = 2;
         float progress = 0f;
         ValueAnimator animator;
 
         TrainingOverlay(Context c) {
             super(c);
             setBackgroundColor(Color.TRANSPARENT);
-            routeShadow.setColor(Color.argb(120, 0, 0, 0));
+
+            routeShadow.setColor(Color.argb(125, 0, 0, 0));
             routeShadow.setStyle(Paint.Style.STROKE);
-            routeShadow.setStrokeWidth(22f);
             routeShadow.setStrokeCap(Paint.Cap.ROUND);
             routeShadow.setStrokeJoin(Paint.Join.ROUND);
 
-            routePaint.setColor(Color.rgb(32, 220, 82));
+            routePaint.setColor(Color.rgb(30, 220, 78));
             routePaint.setStyle(Paint.Style.STROKE);
-            routePaint.setStrokeWidth(12f);
             routePaint.setStrokeCap(Paint.Cap.ROUND);
             routePaint.setStrokeJoin(Paint.Join.ROUND);
 
-            carPaint.setColor(Color.rgb(28, 102, 220));
-            carGlass.setColor(Color.rgb(180, 225, 255));
+            carPaint.setColor(Color.rgb(30, 103, 225));
+            carGlass.setColor(Color.rgb(185, 228, 255));
+        }
+
+        void reset() {
+            if (animator != null) animator.cancel();
+            progress = 0f;
+            invalidate();
         }
 
         void start() {
             if (animator != null) animator.cancel();
             progress = 0f;
             animator = ValueAnimator.ofFloat(0f, 1f);
-            animator.setDuration(6500);
+            animator.setDuration(7000);
             animator.setInterpolator(new LinearInterpolator());
             animator.addUpdateListener(a -> {
                 progress = (float) a.getAnimatedValue();
@@ -127,25 +158,66 @@ public class TemplatePreviewActivity extends Activity {
             animator.start();
         }
 
-        private void buildRoute(float w, float h) {
+        private float X(float left, float size, float n) { return left + size * n; }
+        private float Y(float top, float size, float n) { return top + size * n; }
+
+        private void buildRoute(float left, float top, float s) {
             route.reset();
-            float cx = w * .50f;
-            float cy = h * .50f;
-            float r = Math.min(w, h) * .235f;
-            route.moveTo(cx - w * .030f, h * .96f);
-            route.cubicTo(cx - w * .030f, h * .76f, cx - r * .62f, cy + r * 1.10f, cx - r * .72f, cy + r * .68f);
-            route.cubicTo(cx - r * 1.02f, cy + r * .35f, cx - r * 1.02f, cy - r * .35f, cx - r * .68f, cy - r * .70f);
-            route.cubicTo(cx - r * .35f, cy - r * 1.02f, cx + r * .35f, cy - r * 1.02f, cx + r * .68f, cy - r * .70f);
-            route.cubicTo(cx + r * .90f, cy - r * .45f, cx + r * .96f, cy - r * .10f, cx + r * .92f, cy + r * .10f);
-            route.cubicTo(cx + r * .88f, cy + r * .40f, cx + r * .72f, cy + r * .58f, cx + r * .48f, cy + r * .72f);
-            route.cubicTo(cx + r * .20f, cy + r * .92f, cx + w * .030f, h * .76f, cx + w * .030f, h * .96f);
+
+            // South approach, inbound lane on the left side of the carriageway.
+            route.moveTo(X(left, s, .435f), Y(top, s, .995f));
+            route.cubicTo(X(left, s, .435f), Y(top, s, .86f),
+                    X(left, s, .425f), Y(top, s, .735f),
+                    X(left, s, .392f), Y(top, s, .665f));
+
+            if (exit == 1) {
+                // Clockwise entry, then first exit to the west.
+                route.cubicTo(X(left, s, .340f), Y(top, s, .650f),
+                        X(left, s, .300f), Y(top, s, .620f),
+                        X(left, s, .270f), Y(top, s, .565f));
+                route.cubicTo(X(left, s, .205f), Y(top, s, .555f),
+                        X(left, s, .110f), Y(top, s, .555f),
+                        X(left, s, .005f), Y(top, s, .555f));
+            } else if (exit == 2) {
+                // Ahead: around the west side, leaving northbound.
+                route.cubicTo(X(left, s, .315f), Y(top, s, .625f),
+                        X(left, s, .270f), Y(top, s, .555f),
+                        X(left, s, .270f), Y(top, s, .490f));
+                route.cubicTo(X(left, s, .270f), Y(top, s, .390f),
+                        X(left, s, .335f), Y(top, s, .315f),
+                        X(left, s, .410f), Y(top, s, .285f));
+                route.cubicTo(X(left, s, .435f), Y(top, s, .225f),
+                        X(left, s, .435f), Y(top, s, .120f),
+                        X(left, s, .435f), Y(top, s, .005f));
+            } else {
+                // Right: continue clockwise and leave to the east.
+                route.cubicTo(X(left, s, .315f), Y(top, s, .625f),
+                        X(left, s, .270f), Y(top, s, .555f),
+                        X(left, s, .270f), Y(top, s, .490f));
+                route.cubicTo(X(left, s, .270f), Y(top, s, .365f),
+                        X(left, s, .365f), Y(top, s, .275f),
+                        X(left, s, .490f), Y(top, s, .275f));
+                route.cubicTo(X(left, s, .615f), Y(top, s, .275f),
+                        X(left, s, .700f), Y(top, s, .365f),
+                        X(left, s, .720f), Y(top, s, .470f));
+                route.cubicTo(X(left, s, .755f), Y(top, s, .535f),
+                        X(left, s, .865f), Y(top, s, .545f),
+                        X(left, s, .995f), Y(top, s, .545f));
+            }
         }
 
         @Override protected void onDraw(Canvas c) {
             super.onDraw(c);
             float w = getWidth(), h = getHeight();
             if (w <= 0 || h <= 0) return;
-            buildRoute(w, h);
+
+            float s = Math.min(w, h);
+            float left = (w - s) / 2f;
+            float top = (h - s) / 2f;
+            buildRoute(left, top, s);
+
+            routeShadow.setStrokeWidth(s * .024f);
+            routePaint.setStrokeWidth(s * .013f);
 
             if (showRoute) {
                 c.drawPath(route, routeShadow);
@@ -159,9 +231,10 @@ public class TemplatePreviewActivity extends Activity {
                 c.save();
                 c.translate(pos[0], pos[1]);
                 c.rotate(angle);
-                float cw = Math.min(w, h) * .035f;
-                float ch = cw * 1.65f;
-                RectF body = new RectF(-cw / 2, -ch / 2, cw / 2, ch / 2);
+
+                float cw = s * .030f;
+                float ch = cw * 1.75f;
+                RectF body = new RectF(-cw / 2f, -ch / 2f, cw / 2f, ch / 2f);
                 c.drawRoundRect(body, cw * .22f, cw * .22f, carPaint);
                 RectF glass = new RectF(-cw * .33f, -ch * .18f, cw * .33f, ch * .08f);
                 c.drawRoundRect(glass, cw * .08f, cw * .08f, carGlass);
