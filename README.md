@@ -1,12 +1,6 @@
 # UK Roundabouts Trainer
 
-Android training app for practising UK roundabout approach, lane positioning and exit choice.
+Android roundabout training simulator for UK learners.
 
-Current MVP:
-- choose approach road
-- choose exit
-- visualise roundabout and suggested driving path
-- UK left-side traffic context
-- designed for tablet use
-
-The GitHub Actions workflow builds a debug APK automatically.
+## Visual template proof
+A roundabout image template is stored in `app/src/main/res/drawable/roundabout_template.webp` as a proof that the supplied artwork can be preserved in the Android project and used as a drawable resource.
