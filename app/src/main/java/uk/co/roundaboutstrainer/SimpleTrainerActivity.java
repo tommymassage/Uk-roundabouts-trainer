@@ -34,7 +34,7 @@ public class SimpleTrainerActivity extends Activity {
         root.addView(panel, new LinearLayout.LayoutParams(0,-1,2));
 
         panel.addView(label("UK ROUNDABOUTS TRAINER",24,true));
-        panel.addView(label("v0.8.2 • realistic lane geometry",13,false));
+        panel.addView(label("v0.8.3 • refined UK approach geometry",13,false));
         panel.addView(gap(14));
 
         panel.addView(label("Roundabout type",13,true));
@@ -59,7 +59,7 @@ public class SimpleTrainerActivity extends Activity {
         panel.addView(gap(12));
         TextView info = label("2 Lane • 2nd Exit",15,true); panel.addView(info);
         TextView lane = label("Recommended approach: LEFT LANE",13,false); panel.addView(lane);
-        TextView note = label("Give-way line, approach lane divider and circulating lane lines are app-controlled overlays.",11,false); note.setPadding(0,10,0,0); panel.addView(note);
+        TextView note = label("Give-way markings, splitter island, approach divider and lane arrows are app-controlled overlays.",11,false); note.setPadding(0,10,0,0); panel.addView(note);
 
         Runnable sync = () -> {
             overlay.spiral = type.getSelectedItemPosition()==1;
@@ -90,7 +90,7 @@ public class SimpleTrainerActivity extends Activity {
     private AdapterView.OnItemSelectedListener listener(Runnable r){return new AdapterView.OnItemSelectedListener(){public void onItemSelected(AdapterView<?>p,View v,int i,long id){r.run();}public void onNothingSelected(AdapterView<?>p){}};}
 
     static class RoadOverlay extends View {
-        final Paint white=new Paint(Paint.ANTI_ALIAS_FLAG), route=new Paint(Paint.ANTI_ALIAS_FLAG), guide=new Paint(Paint.ANTI_ALIAS_FLAG), shadow=new Paint(Paint.ANTI_ALIAS_FLAG), car=new Paint(Paint.ANTI_ALIAS_FLAG), glass=new Paint(Paint.ANTI_ALIAS_FLAG), amber=new Paint(Paint.ANTI_ALIAS_FLAG);
+        final Paint white=new Paint(Paint.ANTI_ALIAS_FLAG), route=new Paint(Paint.ANTI_ALIAS_FLAG), guide=new Paint(Paint.ANTI_ALIAS_FLAG), shadow=new Paint(Paint.ANTI_ALIAS_FLAG), car=new Paint(Paint.ANTI_ALIAS_FLAG), glass=new Paint(Paint.ANTI_ALIAS_FLAG), amber=new Paint(Paint.ANTI_ALIAS_FLAG), islandFill=new Paint(Paint.ANTI_ALIAS_FLAG), kerb=new Paint(Paint.ANTI_ALIAS_FLAG), bollard=new Paint(Paint.ANTI_ALIAS_FLAG), blue=new Paint(Paint.ANTI_ALIAS_FLAG);
         final Path routePath=new Path();
         final PathMeasure measure=new PathMeasure();
         final float[] pos=new float[2], tan=new float[2];
@@ -106,6 +106,10 @@ public class SimpleTrainerActivity extends Activity {
             guide.setColor(Color.argb(220,60,160,255));guide.setStyle(Paint.Style.STROKE);guide.setStrokeCap(Paint.Cap.ROUND);
             shadow.setColor(Color.argb(100,0,0,0));shadow.setStyle(Paint.Style.STROKE);shadow.setStrokeCap(Paint.Cap.ROUND);
             car.setColor(Color.rgb(42,105,205));glass.setColor(Color.rgb(185,225,245));amber.setColor(Color.rgb(255,177,40));
+            islandFill.setColor(Color.rgb(190,185,170));islandFill.setStyle(Paint.Style.FILL);
+            kerb.setColor(Color.rgb(235,235,230));kerb.setStyle(Paint.Style.STROKE);kerb.setStrokeJoin(Paint.Join.ROUND);
+            bollard.setColor(Color.rgb(245,220,40));bollard.setStyle(Paint.Style.FILL);
+            blue.setColor(Color.rgb(35,95,180));blue.setStyle(Paint.Style.FILL);
         }
 
         String laneText(){if(spiral){if(exit==1)return "LEFT LANE";if(exit==2)return "LEFT LANE / follow road markings";return "RIGHT LANE / follow spiral markings";}return exit<=2?"LEFT LANE":"RIGHT LANE";}
@@ -136,10 +140,20 @@ public class SimpleTrainerActivity extends Activity {
                 routePath.cubicTo(X(l,s,.75f),Y(t,s,.52f),X(l,s,.65f),Y(t,s,.63f),X(l,s,.57f),Y(t,s,.66f));
                 routePath.cubicTo(X(l,s,.52f),Y(t,s,.70f),X(l,s,.54f),Y(t,s,.84f),X(l,s,.555f),Y(t,s,.995f));
             }
-            if(spiral && exit>=3){
-                // Pull the route gradually outward to mimic lane gain/spiral guidance.
-                Path p=new Path();
-            }
+        }
+
+        void drawSplitterIsland(Canvas c,float l,float t,float s){
+            Path island=new Path();
+            island.moveTo(X(l,s,.485f),Y(t,s,.995f));
+            island.lineTo(X(l,s,.515f),Y(t,s,.995f));
+            island.cubicTo(X(l,s,.520f),Y(t,s,.90f),X(l,s,.518f),Y(t,s,.81f),X(l,s,.508f),Y(t,s,.735f));
+            island.quadTo(X(l,s,.500f),Y(t,s,.705f),X(l,s,.492f),Y(t,s,.735f));
+            island.cubicTo(X(l,s,.482f),Y(t,s,.81f),X(l,s,.480f),Y(t,s,.90f),X(l,s,.485f),Y(t,s,.995f));
+            c.drawPath(island,islandFill);
+            kerb.setStrokeWidth(s*.007f);c.drawPath(island,kerb);
+            float bx=X(l,s,.500f), by=Y(t,s,.755f);float bw=s*.018f,bh=s*.038f;
+            c.drawRoundRect(new RectF(bx-bw/2,by-bh/2,bx+bw/2,by+bh/2),bw*.25f,bw*.25f,bollard);
+            c.drawCircle(bx,by-bh*.12f,bw*.32f,blue);
         }
 
         void drawMarkings(Canvas c,float l,float t,float s){
@@ -150,7 +164,6 @@ public class SimpleTrainerActivity extends Activity {
             white.setPathEffect(new DashPathEffect(new float[]{s*.030f,s*.020f},0));
             c.drawLine(X(l,s,.50f),Y(t,s,.735f),X(l,s,.50f),Y(t,s,.995f),white);
 
-            // UK-style double broken give-way line across both approach lanes.
             white.setPathEffect(null);white.setStrokeWidth(s*.006f);
             for(int row=0;row<2;row++){
                 float yy=.676f+row*.013f;
@@ -160,7 +173,6 @@ public class SimpleTrainerActivity extends Activity {
                 }
             }
 
-            // Short lane edge guidance into the circulating carriageway.
             white.setStrokeWidth(s*.0045f);white.setPathEffect(new DashPathEffect(new float[]{s*.018f,s*.017f},0));
             Path left=new Path();left.moveTo(X(l,s,.445f),Y(t,s,.73f));left.cubicTo(X(l,s,.44f),Y(t,s,.70f),X(l,s,.42f),Y(t,s,.675f),X(l,s,.39f),Y(t,s,.655f));c.drawPath(left,white);
             Path right=new Path();right.moveTo(X(l,s,.555f),Y(t,s,.73f));right.cubicTo(X(l,s,.55f),Y(t,s,.70f),X(l,s,.53f),Y(t,s,.675f),X(l,s,.50f),Y(t,s,.655f));c.drawPath(right,white);
@@ -171,11 +183,24 @@ public class SimpleTrainerActivity extends Activity {
             white.setPathEffect(null);
         }
 
-        void drawArrow(Canvas c,float cx,float cy,float s,boolean right){
+        void drawStraightArrow(Canvas c,float cx,float cy,float s){
             white.setStrokeWidth(s*.0075f);white.setStyle(Paint.Style.STROKE);white.setStrokeCap(Paint.Cap.ROUND);
             c.drawLine(cx,cy+s*.035f,cx,cy-s*.025f,white);
             Path a=new Path();a.moveTo(cx,cy-s*.025f);a.lineTo(cx-s*.017f,cy-s*.006f);a.moveTo(cx,cy-s*.025f);a.lineTo(cx+s*.017f,cy-s*.006f);c.drawPath(a,white);
-            if(right)c.drawLine(cx,cy+s*.008f,cx+s*.025f,cy-s*.006f,white);
+        }
+
+        void drawRightArrow(Canvas c,float cx,float cy,float s){
+            white.setStrokeWidth(s*.0075f);white.setStyle(Paint.Style.STROKE);white.setStrokeCap(Paint.Cap.ROUND);
+            c.drawLine(cx,cy+s*.035f,cx,cy-s*.005f,white);
+            c.drawLine(cx,cy-s*.005f,cx+s*.026f,cy-s*.020f,white);
+            Path a=new Path();a.moveTo(cx+s*.026f,cy-s*.020f);a.lineTo(cx+s*.009f,cy-s*.022f);a.moveTo(cx+s*.026f,cy-s*.020f);a.lineTo(cx+s*.019f,cy-s*.004f);c.drawPath(a,white);
+        }
+
+        void drawLeftArrow(Canvas c,float cx,float cy,float s){
+            white.setStrokeWidth(s*.0075f);white.setStyle(Paint.Style.STROKE);white.setStrokeCap(Paint.Cap.ROUND);
+            c.drawLine(cx,cy+s*.035f,cx,cy-s*.005f,white);
+            c.drawLine(cx,cy-s*.005f,cx-s*.026f,cy-s*.020f,white);
+            Path a=new Path();a.moveTo(cx-s*.026f,cy-s*.020f);a.lineTo(cx-s*.009f,cy-s*.022f);a.moveTo(cx-s*.026f,cy-s*.020f);a.lineTo(cx-s*.019f,cy-s*.004f);c.drawPath(a,white);
         }
 
         void drawCar(Canvas c,float s){
@@ -189,10 +214,14 @@ public class SimpleTrainerActivity extends Activity {
         @Override protected void onDraw(Canvas c){
             super.onDraw(c);float w=getWidth(),h=getHeight();if(w<1||h<1)return;float s=Math.min(w,h),l=(w-s)/2f,t=(h-s)/2f;
             buildRoute(l,t,s);
-            if(showMarkings)drawMarkings(c,l,t,s);
+            if(showMarkings){drawSplitterIsland(c,l,t,s);drawMarkings(c,l,t,s);}
             if(showGuide){guide.setStrokeWidth(s*.010f);guide.setPathEffect(new DashPathEffect(new float[]{s*.03f,s*.025f},0));c.drawPath(routePath,guide);guide.setPathEffect(null);}
             if(showRoute){shadow.setStrokeWidth(s*.020f);route.setStrokeWidth(s*.012f);c.drawPath(routePath,shadow);c.drawPath(routePath,route);}
-            if(showMarkings){drawArrow(c,X(l,s,.445f),Y(t,s,.84f),s,false);drawArrow(c,X(l,s,.555f),Y(t,s,.84f),s,true);}
+            if(showMarkings){
+                if(exit==1){drawLeftArrow(c,X(l,s,.445f),Y(t,s,.84f),s);drawStraightArrow(c,X(l,s,.555f),Y(t,s,.84f),s);} 
+                else if(exit==2){drawStraightArrow(c,X(l,s,.445f),Y(t,s,.84f),s);drawRightArrow(c,X(l,s,.555f),Y(t,s,.84f),s);} 
+                else {drawStraightArrow(c,X(l,s,.445f),Y(t,s,.84f),s);drawRightArrow(c,X(l,s,.555f),Y(t,s,.84f),s);} 
+            }
             drawCar(c,s);
         }
     }
