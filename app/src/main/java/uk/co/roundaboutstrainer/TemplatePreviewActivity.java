@@ -39,9 +39,8 @@ public class TemplatePreviewActivity extends Activity {
         scroll.addView(panel);
         root.addView(scroll, new LinearLayout.LayoutParams(0, -1, 2));
 
-        TextView title = label("UK ROUNDABOUTS TRAINER  v0.7.4", 24, true);
-        panel.addView(title);
-        TextView sub = label("PRESERVED ROUNDABOUT + LIVE TRAINING LAYERS", 14, true);
+        panel.addView(label("UK ROUNDABOUTS TRAINER  v0.7.5", 24, true));
+        TextView sub = label("PRESERVED ROUNDABOUT + MOVING TRAFFIC", 14, true);
         sub.setPadding(0, 8, 0, 16);
         panel.addView(sub);
 
@@ -60,6 +59,13 @@ public class TemplatePreviewActivity extends Activity {
         exit.setSelection(1);
         panel.addView(exit);
 
+        panel.addView(label("Traffic", 14, true));
+        Spinner traffic = new Spinner(this);
+        traffic.setAdapter(new ArrayAdapter<String>(this,
+                android.R.layout.simple_spinner_dropdown_item,
+                new String[]{"Clear roundabout", "Vehicle from the right", "Busy circulating traffic"}));
+        panel.addView(traffic);
+
         CheckBox routeToggle = new CheckBox(this);
         routeToggle.setText("Show training route");
         routeToggle.setChecked(true);
@@ -69,11 +75,6 @@ public class TemplatePreviewActivity extends Activity {
         carToggle.setText("Show learner car");
         carToggle.setChecked(true);
         panel.addView(carToggle);
-
-        CheckBox trafficToggle = new CheckBox(this);
-        trafficToggle.setText("Show vehicle from the right");
-        trafficToggle.setChecked(false);
-        panel.addView(trafficToggle);
 
         Button start = new Button(this);
         start.setText("▶  START DRIVING DEMO");
@@ -91,6 +92,10 @@ public class TemplatePreviewActivity extends Activity {
         guide.setPadding(0, 12, 0, 0);
         panel.addView(guide);
 
+        TextView rule = label("UK rule: give priority to traffic approaching from the right unless signs, signals or markings direct otherwise.", 12, true);
+        rule.setPadding(0, 14, 0, 0);
+        panel.addView(rule);
+
         overlay.listener = (text, value) -> {
             stage.setText(text);
             progress.setProgress(value);
@@ -99,9 +104,7 @@ public class TemplatePreviewActivity extends Activity {
         approach.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 overlay.approach = position;
-                overlay.reset();
-                stage.setText("Ready • MIRRORS");
-                progress.setProgress(0);
+                resetUi(overlay, stage, progress);
             }
             @Override public void onNothingSelected(AdapterView<?> parent) { }
         });
@@ -109,9 +112,15 @@ public class TemplatePreviewActivity extends Activity {
         exit.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 overlay.exit = position + 1;
-                overlay.reset();
-                stage.setText("Ready • MIRRORS");
-                progress.setProgress(0);
+                resetUi(overlay, stage, progress);
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) { }
+        });
+
+        traffic.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                overlay.trafficMode = position;
+                resetUi(overlay, stage, progress);
             }
             @Override public void onNothingSelected(AdapterView<?> parent) { }
         });
@@ -124,13 +133,15 @@ public class TemplatePreviewActivity extends Activity {
             overlay.showCar = checked;
             overlay.invalidate();
         });
-        trafficToggle.setOnCheckedChangeListener((button, checked) -> {
-            overlay.showTraffic = checked;
-            overlay.invalidate();
-        });
         start.setOnClickListener(v -> overlay.start());
 
         setContentView(root);
+    }
+
+    private void resetUi(TrainingOverlay overlay, TextView stage, ProgressBar progress) {
+        overlay.reset();
+        stage.setText("Ready • MIRRORS");
+        progress.setProgress(0);
     }
 
     private TextView label(String text, int size, boolean bold) {
@@ -150,17 +161,21 @@ public class TemplatePreviewActivity extends Activity {
         private final Paint carPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint carGlass = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint trafficPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint traffic2Paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path route = new Path();
+        private final Path trafficPath = new Path();
         private final PathMeasure measure = new PathMeasure();
         private final float[] pos = new float[2];
         private final float[] tan = new float[2];
 
         boolean showRoute = true;
         boolean showCar = true;
-        boolean showTraffic = false;
+        int trafficMode = 0;
         int approach = 0;
         int exit = 2;
+        float raw = 0f;
         float progress = 0f;
+        float trafficProgress = .05f;
         ValueAnimator animator;
         StageListener listener;
 
@@ -178,39 +193,53 @@ public class TemplatePreviewActivity extends Activity {
             carPaint.setColor(Color.rgb(30, 103, 225));
             carGlass.setColor(Color.rgb(185, 228, 255));
             trafficPaint.setColor(Color.rgb(210, 52, 52));
+            traffic2Paint.setColor(Color.rgb(245, 145, 35));
         }
 
         void reset() {
             if (animator != null) animator.cancel();
+            raw = 0f;
             progress = 0f;
+            trafficProgress = .05f;
             invalidate();
         }
 
         void start() {
             if (animator != null) animator.cancel();
+            raw = 0f;
             progress = 0f;
             animator = ValueAnimator.ofFloat(0f, 1f);
-            animator.setDuration(showTraffic ? 8200 : 7000);
+            animator.setDuration(trafficMode == 0 ? 7000 : 9000);
             animator.setInterpolator(new LinearInterpolator());
             animator.addUpdateListener(a -> {
-                float raw = (float) a.getAnimatedValue();
-                if (showTraffic && raw > .22f && raw < .36f) progress = .18f;
-                else if (showTraffic && raw >= .36f) progress = .18f + (raw - .36f) / .64f * .82f;
-                else progress = raw;
-                report(raw);
+                raw = (float) a.getAnimatedValue();
+                trafficProgress = (raw * 1.20f + .05f) % 1f;
+
+                if (trafficMode == 0) {
+                    progress = raw;
+                } else {
+                    float holdStart = .22f;
+                    float holdEnd = trafficMode == 1 ? .43f : .55f;
+                    if (raw < holdStart) progress = raw / holdStart * .18f;
+                    else if (raw < holdEnd) progress = .18f;
+                    else progress = .18f + (raw - holdEnd) / (1f - holdEnd) * .82f;
+                }
+                progress = Math.max(0f, Math.min(1f, progress));
+                report();
                 invalidate();
             });
             animator.start();
         }
 
-        private void report(float raw) {
+        private void report() {
             if (listener == null) return;
             String s;
-            if (raw < .14f) s = "1/6 • MIRRORS";
-            else if (raw < .26f) s = exit == 1 ? "2/6 • SIGNAL LEFT" : exit == 3 ? "2/6 • SIGNAL RIGHT" : "2/6 • SIGNAL normally none";
-            else if (raw < .38f) s = "3/6 • POSITION";
-            else if (raw < .52f) s = showTraffic ? "4/6 • SPEED • GIVE WAY" : "4/6 • SPEED";
-            else if (raw < .68f) s = "5/6 • LOOK RIGHT • safe gap";
+            if (raw < .12f) s = "1/6 • MIRRORS";
+            else if (raw < .22f) s = exit == 1 ? "2/6 • SIGNAL LEFT" : exit == 3 ? "2/6 • SIGNAL RIGHT" : "2/6 • SIGNAL normally none";
+            else if (raw < .32f) s = "3/6 • POSITION";
+            else if (trafficMode > 0 && progress <= .181f) s = "4/6 • SPEED • WAIT • GIVE WAY TO RIGHT";
+            else if (raw < .58f) s = "4/6 • SPEED • prepare to enter";
+            else if (raw < .70f) s = "5/6 • LOOK RIGHT • safe gap";
             else if (raw < .88f) s = "ON ROUNDABOUT • lane discipline";
             else if (raw < .98f) s = "6/6 • SIGNAL LEFT • EXIT";
             else s = "COMPLETE • safe exit";
@@ -239,7 +268,13 @@ public class TemplatePreviewActivity extends Activity {
             }
         }
 
-        private void drawCar(Canvas c, float s, Paint bodyPaint) {
+        private void buildTrafficPath(float left, float top, float s) {
+            trafficPath.reset();
+            RectF ring = new RectF(X(left,s,.285f), Y(top,s,.285f), X(left,s,.715f), Y(top,s,.715f));
+            trafficPath.addArc(ring, 90f, -359f);
+        }
+
+        private void drawCar(Canvas c, float s, Paint bodyPaint, boolean glass) {
             float angle = (float) Math.toDegrees(Math.atan2(tan[1], tan[0])) + 90f;
             c.save();
             c.translate(pos[0], pos[1]);
@@ -248,9 +283,9 @@ public class TemplatePreviewActivity extends Activity {
             float ch = cw * 1.75f;
             RectF body = new RectF(-cw / 2f, -ch / 2f, cw / 2f, ch / 2f);
             c.drawRoundRect(body, cw * .22f, cw * .22f, bodyPaint);
-            if (bodyPaint == carPaint) {
-                RectF glass = new RectF(-cw * .33f, -ch * .18f, cw * .33f, ch * .08f);
-                c.drawRoundRect(glass, cw * .08f, cw * .08f, carGlass);
+            if (glass) {
+                RectF g = new RectF(-cw * .33f, -ch * .18f, cw * .33f, ch * .08f);
+                c.drawRoundRect(g, cw * .08f, cw * .08f, carGlass);
             }
             c.restore();
         }
@@ -266,26 +301,34 @@ public class TemplatePreviewActivity extends Activity {
             float cy = top + s / 2f;
 
             buildSouthRoute(left, top, s);
+            buildTrafficPath(left, top, s);
             routeShadow.setStrokeWidth(s * .024f);
             routePaint.setStrokeWidth(s * .013f);
 
             c.save();
             c.rotate(approach * 90f, cx, cy);
+
             if (showRoute) {
                 c.drawPath(route, routeShadow);
                 c.drawPath(route, routePaint);
             }
+
             if (showCar) {
                 measure.setPath(route, false);
-                measure.getPosTan(measure.getLength() * Math.max(0f, Math.min(1f, progress)), pos, tan);
-                drawCar(c, s, carPaint);
+                measure.getPosTan(measure.getLength() * progress, pos, tan);
+                drawCar(c, s, carPaint, true);
             }
-            if (showTraffic) {
-                Path trafficPath = new Path();
-                trafficPath.addArc(new RectF(X(left,s,.285f), Y(top,s,.285f), X(left,s,.715f), Y(top,s,.715f)), 350f, -150f);
+
+            if (trafficMode > 0) {
                 measure.setPath(trafficPath, false);
-                measure.getPosTan(measure.getLength() * .42f, pos, tan);
-                drawCar(c, s, trafficPaint);
+                measure.getPosTan(measure.getLength() * trafficProgress, pos, tan);
+                drawCar(c, s, trafficPaint, false);
+
+                if (trafficMode == 2) {
+                    float p2 = (trafficProgress + .42f) % 1f;
+                    measure.getPosTan(measure.getLength() * p2, pos, tan);
+                    drawCar(c, s, traffic2Paint, false);
+                }
             }
             c.restore();
         }
