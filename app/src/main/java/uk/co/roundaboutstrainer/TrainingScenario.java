@@ -7,6 +7,7 @@ public final class TrainingScenario {
     public final UkRoundaboutRules.ApproachLane approachLane;
     public final UkRoundaboutRules.Signal approachSignal;
     public final String hint;
+    public final String objective;
 
     private TrainingScenario(boolean spiral, int exit) {
         this.spiral = spiral;
@@ -14,6 +15,7 @@ public final class TrainingScenario {
         this.approachLane = UkRoundaboutRules.approachLane(spiral, exit);
         this.approachSignal = UkRoundaboutRules.approachSignal(exit);
         this.hint = UkRoundaboutRules.learnerHint(spiral, exit);
+        this.objective = buildObjective();
     }
 
     public static TrainingScenario create(boolean spiral, int exit) {
@@ -31,5 +33,14 @@ public final class TrainingScenario {
             case RIGHT: return "RIGHT LANE";
             default: return "FOLLOW ROAD MARKINGS";
         }
+    }
+
+    public String signalLabel() { return UkRoundaboutRules.signalLabel(approachSignal); }
+
+    public String buildObjective() {
+        if (exit == 1) return "Enter correctly, keep left and leave at the first exit.";
+        if (exit == 2) return "Hold the correct lane and prepare a left signal before leaving.";
+        if (exit == 3) return "Approach correctly, maintain lane discipline and exit safely.";
+        return "Complete the full circulation while maintaining correct lane discipline.";
     }
 }
