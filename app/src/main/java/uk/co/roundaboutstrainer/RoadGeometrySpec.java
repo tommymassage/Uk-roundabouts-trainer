@@ -17,10 +17,21 @@ public final class RoadGeometrySpec {
     public final float splitterBottomY = 0.930f;
     public final float splitterHalfWidth = 0.027f;
 
+    public final float arrowLeftX = 0.445f;
+    public final float arrowRightX = 0.555f;
+    public final float arrowY = 0.840f;
+    public final float laneGuideInset = 0.018f;
+    public final float giveWayRowSpacing = 0.013f;
+    public final float spiralGuideBias = 0.020f;
+
     public final float[] exitAnglesDeg = {180f, 270f, 0f, 90f};
 
     public float approachCentreForExit(int exit) {
         return exit <= 2 ? approachLeftCentre : approachRightCentre;
+    }
+
+    public float arrowXForExit(int exit) {
+        return exit <= 2 ? arrowLeftX : arrowRightX;
     }
 
     public boolean validExit(int exit) { return exit >= 1 && exit <= 4; }
