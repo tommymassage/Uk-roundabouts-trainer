@@ -29,17 +29,22 @@ public class TracedSimulationActivity extends Activity {
         panel.setPadding(18,16,18,16);
         panel.setBackgroundColor(Color.argb(225,20,25,30));
         panel.addView(label("2 Lane Roundabout",20,true));
-        panel.addView(label("User-traced simulation",12,false));
-        panel.addView(space(12));
+        panel.addView(label("No road arrows - default lane rule",12,false));
+        panel.addView(space(10));
 
         RadioGroup exits = new RadioGroup(this);
-        RadioButton e1 = radio("1st Exit (Left)");
-        RadioButton e2 = radio("2nd Exit (Straight Ahead)");
-        exits.addView(e1); exits.addView(e2);
+        RadioButton e1 = radio("1st Exit (Left / 9:00)");
+        RadioButton e2 = radio("2nd Exit (Straight / 12:00)");
+        RadioButton e3 = radio("3rd Exit (Right / 3:00)");
+        RadioButton e4 = radio("4th Exit (U-turn / 6:00)");
+        exits.addView(e1); exits.addView(e2); exits.addView(e3); exits.addView(e4);
         e1.setChecked(true);
         panel.addView(exits);
 
-        panel.addView(space(12));
+        TextView laneInfo = label("LEFT approach lane • OUTER arc",13,true);
+        laneInfo.setPadding(0,8,0,8);
+        panel.addView(laneInfo);
+
         Switch showRoute = toggle("Show Route", true);
         panel.addView(showRoute);
 
@@ -50,13 +55,20 @@ public class TracedSimulationActivity extends Activity {
         reset.setText("RESET");
         panel.addView(reset,new LinearLayout.LayoutParams(-1,48));
 
-        FrameLayout.LayoutParams pp = new FrameLayout.LayoutParams(dp(275),-2);
+        FrameLayout.LayoutParams pp = new FrameLayout.LayoutParams(dp(300),-2);
         pp.gravity = Gravity.TOP|Gravity.LEFT;
         pp.setMargins(dp(10),dp(10),0,0);
         root.addView(panel,pp);
 
         exits.setOnCheckedChangeListener((g,id)->{
-            overlay.exit = (id==e2.getId()) ? 2 : 1;
+            if(id==e2.getId()) overlay.exit=2;
+            else if(id==e3.getId()) overlay.exit=3;
+            else if(id==e4.getId()) overlay.exit=4;
+            else overlay.exit=1;
+
+            boolean left = UserTracedRouteLibrary.usesLeftApproachLane(overlay.exit);
+            boolean outer = UserTracedRouteLibrary.usesOuterArc(overlay.exit);
+            laneInfo.setText((left?"LEFT":"RIGHT")+" approach lane • "+(outer?"OUTER":"INNER")+" arc");
             overlay.reset();
         });
         showRoute.setOnCheckedChangeListener((v,c)->{overlay.showRoute=c;overlay.invalidate();});
@@ -102,14 +114,22 @@ public class TracedSimulationActivity extends Activity {
         }
 
         void reset(){if(animator!=null)animator.cancel();progress=0f;invalidate();}
+
         void start(){
             if(!UserTracedRouteLibrary.hasUserTrace(exit)) return;
             if(animator!=null)animator.cancel();
             animator=ValueAnimator.ofFloat(0f,1f);
-            animator.setDuration(exit==1?5200:7000);
+            animator.setDuration(durationForExit(exit));
             animator.setInterpolator(new LinearInterpolator());
             animator.addUpdateListener(a->{progress=(float)a.getAnimatedValue();invalidate();});
             animator.start();
+        }
+
+        private long durationForExit(int exit){
+            if(exit==1)return 5200;
+            if(exit==2)return 7000;
+            if(exit==3)return 8600;
+            return 10200;
         }
 
         private void buildPath(){
@@ -118,7 +138,7 @@ public class TracedSimulationActivity extends Activity {
             if(p.length<2) return;
             float w=getWidth(), h=getHeight();
             path.moveTo(p[0][0]*w,p[0][1]*h);
-            // Quadratic midpoint smoothing preserves the user's route while removing finger jitter.
+            // Midpoint quadratic smoothing removes finger jitter while keeping the traced route shape.
             for(int i=1;i<p.length-1;i++){
                 float x=p[i][0]*w, y=p[i][1]*h;
                 float mx=(p[i][0]+p[i+1][0])*.5f*w;
@@ -142,6 +162,18 @@ public class TracedSimulationActivity extends Activity {
             drawCar(c,s);
         }
 
+        private boolean rightIndicatorOn(){
+            // For exits after 12 o'clock, approach on the right lane and signal right initially.
+            return exit>=3 && progress<0.63f;
+        }
+
+        private boolean leftIndicatorOn(){
+            if(exit==1) return true;
+            if(exit==2) return progress>0.70f;
+            if(exit==3) return progress>0.70f;
+            return progress>0.78f;
+        }
+
         private void drawCar(Canvas c,float s){
             pm.setPath(path,false);
             if(pm.getLength()<=0)return;
@@ -153,8 +185,10 @@ public class TracedSimulationActivity extends Activity {
             float cw=s*.032f, ch=cw*1.75f;
             c.drawRoundRect(new RectF(-cw/2,-ch/2,cw/2,ch/2),cw*.2f,cw*.2f,carPaint);
             c.drawRoundRect(new RectF(-cw*.33f,-ch*.18f,cw*.33f,ch*.10f),cw*.08f,cw*.08f,glassPaint);
-            boolean leftSignal = exit==1 || (exit==2 && progress>0.72f);
-            if(leftSignal && ((int)(progress*50))%2==0) c.drawCircle(-cw*.42f,-ch*.34f,cw*.10f,indicatorPaint);
+
+            boolean blink=((int)(progress*60))%2==0;
+            if(blink && leftIndicatorOn()) c.drawCircle(-cw*.42f,-ch*.34f,cw*.10f,indicatorPaint);
+            if(blink && rightIndicatorOn()) c.drawCircle(cw*.42f,-ch*.34f,cw*.10f,indicatorPaint);
             c.restore();
         }
     }
