@@ -24,7 +24,7 @@ public final class FirstExitSimulation {
     }
 
     public static RouteSpec route(RoadGeometrySpec geometry) {
-        return RouteSpec.forScenario(scenario(), geometry);
+        return RouteSpec.forScenario(SPIRAL, EXIT);
     }
 
     public static Phase phaseFor(float progress) {
