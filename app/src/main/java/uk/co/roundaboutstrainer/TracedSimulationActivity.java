@@ -73,11 +73,26 @@ public class TracedSimulationActivity extends Activity {
         @Override protected void onDraw(Canvas c){super.onDraw(c);if(getWidth()==0||getHeight()==0)return;buildPath();float s=Math.min(imageRect.width(),imageRect.height());if(showRoute){shadowPaint.setStrokeWidth(s*.016f);routePaint.setStrokeWidth(s*.007f);c.drawPath(path,shadowPaint);c.drawPath(path,routePaint);}drawSelectedExit(c,s);drawShowRouteState(c,s);drawCar(c,s);}
         private void drawSelectedExit(Canvas c,float s){float[] ys={.115f,.149f,.182f,.215f};c.drawCircle(mapX(.0247f),mapY(ys[Math.max(0,Math.min(3,exit-1))]),s*.006f,uiBlue);}
         private void drawShowRouteState(Canvas c,float s){c.drawCircle(mapX(showRoute?.888f:.874f),mapY(.0335f),s*.009f,showRoute?uiBlue:uiWhite);}
-        @Override public boolean onTouchEvent(MotionEvent e){if(e.getAction()!=MotionEvent.ACTION_UP)return true;updateImageRect();if(imageRect.isEmpty()||!imageRect.contains(e.getX(),e.getY()))return true;float x=normX(e.getX()),y=normY(e.getY());if(x>=.010f&&x<=.185f){if(y>=.098f&&y<.132f){selectExit(1);return true;}if(y<.166f&&y>=.132f){selectExit(2);return true;}if(y<.199f&&y>=.166f){selectExit(3);return true;}if(y<=.235f&&y>=.199f){selectExit(4);return true;}}if(x>=.748f&&x<=.915f&&y>=.012f&&y<=.055f){showRoute=!showRoute;invalidate();return true;}if(x>=.760f&&x<=.905f&&y>=.139f&&y<=.190f){start();return true;}return true;}
+        @Override public boolean onTouchEvent(MotionEvent e){
+            if(e.getAction()!=MotionEvent.ACTION_DOWN)return true;
+            updateImageRect();
+            if(imageRect.isEmpty()||!imageRect.contains(e.getX(),e.getY()))return true;
+            float x=normX(e.getX()),y=normY(e.getY());
+            if(x>=.010f&&x<=.185f){
+                if(y>=.098f&&y<.132f){selectExit(1);return true;}
+                if(y<.166f&&y>=.132f){selectExit(2);return true;}
+                if(y<.199f&&y>=.166f){selectExit(3);return true;}
+                if(y<=.235f&&y>=.199f){selectExit(4);return true;}
+            }
+            if(x>=.748f&&x<=.915f&&y>=.012f&&y<=.055f){showRoute=!showRoute;invalidate();return true;}
+            // Larger touch target and immediate ACTION_DOWN response for the baked START button.
+            if(x>=.730f&&x<=.930f&&y>=.120f&&y<=.210f){start();return true;}
+            return true;
+        }
         private void selectExit(int e){exit=e;reset();}
         private boolean rightIndicatorOn(){return (exit==3||exit==4)&&progress<.60f;}
         private boolean leftIndicatorOn(){if(exit==1)return progress<.62f;if(exit==2)return progress>.68f;if(exit==3)return progress>.67f;return progress>.75f;}
-        private void drawCar(Canvas c,float s){pm.setPath(path,false);float len=pm.getLength();if(len<=0)return;pm.getPosTan(len*Math.max(0f,Math.min(1f,progress)),pos,tan);float angle=(float)Math.toDegrees(Math.atan2(tan[1],tan[0]))+90f;c.save();c.translate(pos[0],pos[1]);c.rotate(angle);float cw=s*.028f,ch=cw*1.82f;
+        private void drawCar(Canvas c,float s){pm.setPath(path,false);float len=pm.getLength();if(len<=0)return;pm.getPosTan(len*Math.max(0f,Math.min(1f,progress)),pos,tan);float angle=(float)Math.toDegrees(Math.atan2(tan[1],tan[0]))+90f;c.save();c.translate(pos[0],pos[1]);c.rotate(angle);float cw=s*.032f,ch=cw*1.82f;
             c.drawRoundRect(new RectF(-cw*.58f,-ch*.31f,-cw*.43f,ch*.30f),cw*.07f,cw*.07f,tyrePaint);c.drawRoundRect(new RectF(cw*.43f,-ch*.31f,cw*.58f,ch*.30f),cw*.07f,cw*.07f,tyrePaint);
             c.drawRoundRect(new RectF(-cw/2,-ch/2,cw/2,ch/2),cw*.20f,cw*.20f,carPaint);c.drawRoundRect(new RectF(-cw*.34f,-ch*.18f,cw*.34f,ch*.08f),cw*.08f,cw*.08f,glassPaint);
             c.drawCircle(-cw*.28f,-ch*.43f,cw*.07f,lightPaint);c.drawCircle(cw*.28f,-ch*.43f,cw*.07f,lightPaint);
