@@ -17,6 +17,10 @@
         <activity
             android:name=".SimpleTrainerActivity"
             android:screenOrientation="landscape"
+            android:exported="false" />
+        <activity
+            android:name=".TracedSimulationActivity"
+            android:screenOrientation="landscape"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
