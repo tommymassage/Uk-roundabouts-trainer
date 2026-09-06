@@ -5,10 +5,11 @@ import android.app.Activity;
 import android.content.Context;
 import android.graphics.*;
 import android.os.Bundle;
-import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
-import android.widget.*;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 
 public class TracedSimulationActivity extends Activity {
     @Override public void onCreate(Bundle b) {
@@ -19,73 +20,16 @@ public class TracedSimulationActivity extends Activity {
 
         ImageView bg = new ImageView(this);
         bg.setImageResource(R.drawable.roundabout_master);
-        // Permanent approved MASTER TEMPLATE: 1536 x 1152 (4:3).
-        // FIT_CENTER preserves the exact image geometry without cropping.
         bg.setScaleType(ImageView.ScaleType.FIT_CENTER);
         root.addView(bg, new FrameLayout.LayoutParams(-1,-1));
 
+        // All interaction is now aligned directly to the controls baked into MASTER.
+        // No extra Android panel is drawn over the approved image.
         TracedOverlay overlay = new TracedOverlay(this);
         root.addView(overlay, new FrameLayout.LayoutParams(-1,-1));
 
-        LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(18,16,18,16);
-        panel.setBackgroundColor(Color.argb(225,20,25,30));
-        panel.addView(label("2 Lane Roundabout",20,true));
-        panel.addView(label("User-traced routes • 6 o'clock approach",12,false));
-        panel.addView(space(10));
-
-        RadioGroup exits = new RadioGroup(this);
-        RadioButton e1 = radio("1st Exit (Left / 9:00)");
-        RadioButton e2 = radio("2nd Exit (Straight / 12:00)");
-        RadioButton e3 = radio("3rd Exit (Right / 3:00)");
-        RadioButton e4 = radio("4th Exit (U-turn / 6:00)");
-        exits.addView(e1); exits.addView(e2); exits.addView(e3); exits.addView(e4);
-        e1.setChecked(true);
-        panel.addView(exits);
-
-        TextView laneInfo = label("LEFT approach lane • OUTER arc",13,true);
-        laneInfo.setPadding(0,8,0,8);
-        panel.addView(laneInfo);
-
-        Switch showRoute = toggle("Show Route", true);
-        panel.addView(showRoute);
-
-        Button start = new Button(this);
-        start.setText("START");
-        panel.addView(start,new LinearLayout.LayoutParams(-1,56));
-        Button reset = new Button(this);
-        reset.setText("RESET");
-        panel.addView(reset,new LinearLayout.LayoutParams(-1,48));
-
-        FrameLayout.LayoutParams pp = new FrameLayout.LayoutParams(dp(300),-2);
-        pp.gravity = Gravity.TOP|Gravity.LEFT;
-        pp.setMargins(dp(10),dp(10),0,0);
-        root.addView(panel,pp);
-
-        exits.setOnCheckedChangeListener((g,id)->{
-            if(id==e2.getId()) overlay.exit=2;
-            else if(id==e3.getId()) overlay.exit=3;
-            else if(id==e4.getId()) overlay.exit=4;
-            else overlay.exit=1;
-
-            boolean left = UserTracedRouteLibrary.usesLeftApproachLane(overlay.exit);
-            boolean outer = UserTracedRouteLibrary.usesOuterArc(overlay.exit);
-            laneInfo.setText((left?"LEFT":"RIGHT")+" approach lane • "+(outer?"OUTER":"INNER")+" arc");
-            overlay.reset();
-        });
-        showRoute.setOnCheckedChangeListener((v,c)->{overlay.showRoute=c;overlay.invalidate();});
-        start.setOnClickListener(v->overlay.start());
-        reset.setOnClickListener(v->overlay.reset());
-
         setContentView(root);
     }
-
-    private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
-    private View space(int h){View v=new View(this);v.setLayoutParams(new LinearLayout.LayoutParams(1,dp(h)));return v;}
-    private TextView label(String s,int size,boolean bold){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(Color.WHITE);if(bold)v.setTypeface(null,Typeface.BOLD);return v;}
-    private RadioButton radio(String s){RadioButton r=new RadioButton(this);r.setText(s);r.setTextColor(Color.WHITE);r.setId(View.generateViewId());return r;}
-    private Switch toggle(String s,boolean checked){Switch sw=new Switch(this);sw.setText(s);sw.setTextColor(Color.WHITE);sw.setChecked(checked);return sw;}
 
     static final class TracedOverlay extends View {
         private static final float MASTER_ASPECT = 1536f / 1152f;
@@ -94,35 +38,50 @@ public class TracedSimulationActivity extends Activity {
         private final Paint carPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint glassPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint indicatorPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint uiBlue = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint uiWhite = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path path = new Path();
         private final PathMeasure pm = new PathMeasure();
         private final RectF imageRect = new RectF();
         private final float[] pos = new float[2];
         private final float[] tan = new float[2];
+
         int exit = 1;
-        boolean showRoute = true;
+        boolean showRoute = false; // matches MASTER switch appearance
         float progress = 0f;
         ValueAnimator animator;
 
         TracedOverlay(Context c){
             super(c);
+            setClickable(true);
+
             routePaint.setColor(Color.rgb(25,220,95));
             routePaint.setStyle(Paint.Style.STROKE);
             routePaint.setStrokeCap(Paint.Cap.ROUND);
             routePaint.setStrokeJoin(Paint.Join.ROUND);
+
             shadowPaint.setColor(Color.argb(110,0,0,0));
             shadowPaint.setStyle(Paint.Style.STROKE);
             shadowPaint.setStrokeCap(Paint.Cap.ROUND);
+
             carPaint.setColor(Color.rgb(40,92,155));
             glassPaint.setColor(Color.rgb(170,215,235));
             indicatorPaint.setColor(Color.rgb(255,178,40));
+
+            uiBlue.setColor(Color.rgb(20,120,230));
+            uiWhite.setColor(Color.WHITE);
+            uiWhite.setStyle(Paint.Style.STROKE);
         }
 
-        void reset(){if(animator!=null)animator.cancel();progress=0f;invalidate();}
+        void reset(){
+            if(animator!=null) animator.cancel();
+            progress=0f;
+            invalidate();
+        }
 
         void start(){
             if(!UserTracedRouteLibrary.hasUserTrace(exit)) return;
-            if(animator!=null)animator.cancel();
+            if(animator!=null) animator.cancel();
             animator=ValueAnimator.ofFloat(0f,1f);
             animator.setDuration(durationForExit(exit));
             animator.setInterpolator(new LinearInterpolator());
@@ -153,6 +112,8 @@ public class TracedSimulationActivity extends Activity {
 
         private float mapX(float nx){return imageRect.left + nx*imageRect.width();}
         private float mapY(float ny){return imageRect.top + ny*imageRect.height();}
+        private float normX(float x){return (x-imageRect.left)/imageRect.width();}
+        private float normY(float y){return (y-imageRect.top)/imageRect.height();}
 
         private void buildPath(){
             updateImageRect();
@@ -174,13 +135,69 @@ public class TracedSimulationActivity extends Activity {
             if(getWidth()==0||getHeight()==0)return;
             buildPath();
             float s=Math.min(imageRect.width(),imageRect.height());
+
             if(showRoute){
                 shadowPaint.setStrokeWidth(s*.018f);
                 routePaint.setStrokeWidth(s*.009f);
                 c.drawPath(path,shadowPaint);
                 c.drawPath(path,routePaint);
             }
+
+            drawSelectedExit(c,s);
+            drawShowRouteState(c,s);
             drawCar(c,s);
+        }
+
+        private void drawSelectedExit(Canvas c,float s){
+            final float[] ys={0.115f,0.149f,0.182f,0.215f};
+            float cx=mapX(0.0247f);
+            float cy=mapY(ys[Math.max(0,Math.min(3,exit-1))]);
+            float r=s*.0060f;
+            c.drawCircle(cx,cy,r,uiBlue);
+        }
+
+        private void drawShowRouteState(Canvas c,float s){
+            // Small knob overlay so the baked switch visibly follows the actual route state.
+            float cy=mapY(0.0335f);
+            float cx=mapX(showRoute ? 0.888f : 0.874f);
+            float r=s*.0090f;
+            c.drawCircle(cx,cy,r,showRoute ? uiBlue : uiWhite);
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent e){
+            if(e.getAction()!=MotionEvent.ACTION_UP) return true;
+            updateImageRect();
+            if(imageRect.isEmpty() || !imageRect.contains(e.getX(),e.getY())) return true;
+
+            float x=normX(e.getX());
+            float y=normY(e.getY());
+
+            // Exit rows on the left MASTER panel.
+            if(x>=0.010f && x<=0.185f){
+                if(y>=0.098f && y<0.132f){selectExit(1);return true;}
+                if(y>=0.132f && y<0.166f){selectExit(2);return true;}
+                if(y>=0.166f && y<0.199f){selectExit(3);return true;}
+                if(y>=0.199f && y<=0.235f){selectExit(4);return true;}
+            }
+
+            // Show Route row on the right MASTER panel.
+            if(x>=0.748f && x<=0.915f && y>=0.012f && y<=0.055f){
+                showRoute=!showRoute;
+                invalidate();
+                return true;
+            }
+
+            // START button baked into MASTER.
+            if(x>=0.760f && x<=0.905f && y>=0.139f && y<=0.190f){
+                start();
+                return true;
+            }
+            return true;
+        }
+
+        private void selectExit(int selected){
+            exit=selected;
+            reset();
         }
 
         private boolean rightIndicatorOn(){return exit>=3 && progress<0.63f;}
