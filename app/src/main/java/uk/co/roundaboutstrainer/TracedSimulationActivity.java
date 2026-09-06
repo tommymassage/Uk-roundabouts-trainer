@@ -15,10 +15,13 @@ public class TracedSimulationActivity extends Activity {
         super.onCreate(b);
 
         FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.BLACK);
 
         ImageView bg = new ImageView(this);
         bg.setImageResource(R.drawable.roundabout_template);
-        bg.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        // The approved MASTER TEMPLATE is 1408 x 1056 (4:3).
+        // FIT_CENTER keeps its geometry intact instead of cropping the road layout.
+        bg.setScaleType(ImageView.ScaleType.FIT_CENTER);
         root.addView(bg, new FrameLayout.LayoutParams(-1,-1));
 
         TracedOverlay overlay = new TracedOverlay(this);
@@ -29,7 +32,7 @@ public class TracedSimulationActivity extends Activity {
         panel.setPadding(18,16,18,16);
         panel.setBackgroundColor(Color.argb(225,20,25,30));
         panel.addView(label("2 Lane Roundabout",20,true));
-        panel.addView(label("No road arrows - default lane rule",12,false));
+        panel.addView(label("User-traced routes • 6 o'clock approach",12,false));
         panel.addView(space(10));
 
         RadioGroup exits = new RadioGroup(this);
@@ -85,6 +88,7 @@ public class TracedSimulationActivity extends Activity {
     private Switch toggle(String s,boolean checked){Switch sw=new Switch(this);sw.setText(s);sw.setTextColor(Color.WHITE);sw.setChecked(checked);return sw;}
 
     static final class TracedOverlay extends View {
+        private static final float MASTER_ASPECT = 1408f / 1056f;
         private final Paint routePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint carPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -92,6 +96,7 @@ public class TracedSimulationActivity extends Activity {
         private final Paint indicatorPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path path = new Path();
         private final PathMeasure pm = new PathMeasure();
+        private final RectF imageRect = new RectF();
         private final float[] pos = new float[2];
         private final float[] tan = new float[2];
         int exit = 1;
@@ -132,27 +137,44 @@ public class TracedSimulationActivity extends Activity {
             return 10200;
         }
 
+        private void updateImageRect(){
+            float vw=getWidth(), vh=getHeight();
+            if(vw<=0||vh<=0){imageRect.setEmpty();return;}
+            if(vw/vh > MASTER_ASPECT){
+                float iw=vh*MASTER_ASPECT;
+                float left=(vw-iw)/2f;
+                imageRect.set(left,0,left+iw,vh);
+            }else{
+                float ih=vw/MASTER_ASPECT;
+                float top=(vh-ih)/2f;
+                imageRect.set(0,top,vw,top+ih);
+            }
+        }
+
+        private float mapX(float nx){return imageRect.left + nx*imageRect.width();}
+        private float mapY(float ny){return imageRect.top + ny*imageRect.height();}
+
         private void buildPath(){
+            updateImageRect();
             float[][] p = UserTracedRouteLibrary.pointsForExit(exit);
             path.reset();
-            if(p.length<2) return;
-            float w=getWidth(), h=getHeight();
-            path.moveTo(p[0][0]*w,p[0][1]*h);
-            // Midpoint quadratic smoothing removes finger jitter while keeping the traced route shape.
+            if(p.length<2 || imageRect.isEmpty()) return;
+            path.moveTo(mapX(p[0][0]),mapY(p[0][1]));
+            // Very light midpoint smoothing only: the user's trace remains the route source of truth.
             for(int i=1;i<p.length-1;i++){
-                float x=p[i][0]*w, y=p[i][1]*h;
-                float mx=(p[i][0]+p[i+1][0])*.5f*w;
-                float my=(p[i][1]+p[i+1][1])*.5f*h;
+                float x=mapX(p[i][0]), y=mapY(p[i][1]);
+                float mx=mapX((p[i][0]+p[i+1][0])*.5f);
+                float my=mapY((p[i][1]+p[i+1][1])*.5f);
                 path.quadTo(x,y,mx,my);
             }
-            path.lineTo(p[p.length-1][0]*w,p[p.length-1][1]*h);
+            path.lineTo(mapX(p[p.length-1][0]),mapY(p[p.length-1][1]));
         }
 
         @Override protected void onDraw(Canvas c){
             super.onDraw(c);
             if(getWidth()==0||getHeight()==0)return;
             buildPath();
-            float s=Math.min(getWidth(),getHeight());
+            float s=Math.min(imageRect.width(),imageRect.height());
             if(showRoute){
                 shadowPaint.setStrokeWidth(s*.018f);
                 routePaint.setStrokeWidth(s*.009f);
@@ -162,11 +184,7 @@ public class TracedSimulationActivity extends Activity {
             drawCar(c,s);
         }
 
-        private boolean rightIndicatorOn(){
-            // For exits after 12 o'clock, approach on the right lane and signal right initially.
-            return exit>=3 && progress<0.63f;
-        }
-
+        private boolean rightIndicatorOn(){return exit>=3 && progress<0.63f;}
         private boolean leftIndicatorOn(){
             if(exit==1) return true;
             if(exit==2) return progress>0.70f;
@@ -185,7 +203,6 @@ public class TracedSimulationActivity extends Activity {
             float cw=s*.032f, ch=cw*1.75f;
             c.drawRoundRect(new RectF(-cw/2,-ch/2,cw/2,ch/2),cw*.2f,cw*.2f,carPaint);
             c.drawRoundRect(new RectF(-cw*.33f,-ch*.18f,cw*.33f,ch*.10f),cw*.08f,cw*.08f,glassPaint);
-
             boolean blink=((int)(progress*60))%2==0;
             if(blink && leftIndicatorOn()) c.drawCircle(-cw*.42f,-ch*.34f,cw*.10f,indicatorPaint);
             if(blink && rightIndicatorOn()) c.drawCircle(cw*.42f,-ch*.34f,cw*.10f,indicatorPaint);
