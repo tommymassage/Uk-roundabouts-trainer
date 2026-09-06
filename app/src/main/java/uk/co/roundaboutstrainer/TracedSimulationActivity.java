@@ -28,7 +28,7 @@ public class TracedSimulationActivity extends Activity {
         private static final float MASTER_ASPECT=1536f/1152f;
         private static final float SPLINE_TENSION=.78f;
         private final Paint routePaint=new Paint(Paint.ANTI_ALIAS_FLAG), shadowPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint carPaint=new Paint(Paint.ANTI_ALIAS_FLAG), glassPaint=new Paint(Paint.ANTI_ALIAS_FLAG), tyrePaint=new Paint(Paint.ANTI_ALIAS_FLAG), lightPaint=new Paint(Paint.ANTI_ALIAS_FLAG), indicatorPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint carPaint=new Paint(Paint.ANTI_ALIAS_FLAG), carDarkPaint=new Paint(Paint.ANTI_ALIAS_FLAG), glassPaint=new Paint(Paint.ANTI_ALIAS_FLAG), tyrePaint=new Paint(Paint.ANTI_ALIAS_FLAG), lightPaint=new Paint(Paint.ANTI_ALIAS_FLAG), rearLightPaint=new Paint(Paint.ANTI_ALIAS_FLAG), indicatorPaint=new Paint(Paint.ANTI_ALIAS_FLAG), trimPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint uiBlue=new Paint(Paint.ANTI_ALIAS_FLAG), uiWhite=new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path path=new Path(); private final PathMeasure pm=new PathMeasure(); private final RectF imageRect=new RectF();
         private final float[] pos=new float[2],tan=new float[2];
@@ -37,7 +37,7 @@ public class TracedSimulationActivity extends Activity {
         TracedOverlay(Context c){super(c);setClickable(true);
             routePaint.setColor(Color.rgb(25,220,95));routePaint.setStyle(Paint.Style.STROKE);routePaint.setStrokeCap(Paint.Cap.ROUND);routePaint.setStrokeJoin(Paint.Join.ROUND);
             shadowPaint.setColor(Color.argb(110,0,0,0));shadowPaint.setStyle(Paint.Style.STROKE);shadowPaint.setStrokeCap(Paint.Cap.ROUND);
-            carPaint.setColor(Color.rgb(40,92,155));glassPaint.setColor(Color.rgb(170,215,235));tyrePaint.setColor(Color.rgb(25,25,25));lightPaint.setColor(Color.rgb(245,245,210));indicatorPaint.setColor(Color.rgb(255,178,40));
+            carPaint.setColor(Color.rgb(210,45,45));carDarkPaint.setColor(Color.rgb(135,24,28));glassPaint.setColor(Color.rgb(105,155,180));tyrePaint.setColor(Color.rgb(22,22,22));lightPaint.setColor(Color.rgb(245,245,215));rearLightPaint.setColor(Color.rgb(220,28,35));indicatorPaint.setColor(Color.rgb(255,178,40));trimPaint.setColor(Color.rgb(45,45,45));
             uiBlue.setColor(Color.rgb(20,120,230));uiWhite.setColor(Color.WHITE);uiWhite.setStyle(Paint.Style.STROKE);
         }
         void reset(){if(animator!=null)animator.cancel();progress=0f;invalidate();}
@@ -85,17 +85,65 @@ public class TracedSimulationActivity extends Activity {
                 if(y<=.235f&&y>=.199f){selectExit(4);return true;}
             }
             if(x>=.748f&&x<=.915f&&y>=.012f&&y<=.055f){showRoute=!showRoute;invalidate();return true;}
-            // Larger touch target and immediate ACTION_DOWN response for the baked START button.
             if(x>=.730f&&x<=.930f&&y>=.120f&&y<=.210f){start();return true;}
             return true;
         }
         private void selectExit(int e){exit=e;reset();}
         private boolean rightIndicatorOn(){return (exit==3||exit==4)&&progress<.60f;}
         private boolean leftIndicatorOn(){if(exit==1)return progress<.62f;if(exit==2)return progress>.68f;if(exit==3)return progress>.67f;return progress>.75f;}
-        private void drawCar(Canvas c,float s){pm.setPath(path,false);float len=pm.getLength();if(len<=0)return;pm.getPosTan(len*Math.max(0f,Math.min(1f,progress)),pos,tan);float angle=(float)Math.toDegrees(Math.atan2(tan[1],tan[0]))+90f;c.save();c.translate(pos[0],pos[1]);c.rotate(angle);float cw=s*.032f,ch=cw*1.82f;
-            c.drawRoundRect(new RectF(-cw*.58f,-ch*.31f,-cw*.43f,ch*.30f),cw*.07f,cw*.07f,tyrePaint);c.drawRoundRect(new RectF(cw*.43f,-ch*.31f,cw*.58f,ch*.30f),cw*.07f,cw*.07f,tyrePaint);
-            c.drawRoundRect(new RectF(-cw/2,-ch/2,cw/2,ch/2),cw*.20f,cw*.20f,carPaint);c.drawRoundRect(new RectF(-cw*.34f,-ch*.18f,cw*.34f,ch*.08f),cw*.08f,cw*.08f,glassPaint);
-            c.drawCircle(-cw*.28f,-ch*.43f,cw*.07f,lightPaint);c.drawCircle(cw*.28f,-ch*.43f,cw*.07f,lightPaint);
-            boolean blink=((int)(progress*34))%2==0;if(blink&&leftIndicatorOn())c.drawCircle(-cw*.43f,-ch*.39f,cw*.095f,indicatorPaint);if(blink&&rightIndicatorOn())c.drawCircle(cw*.43f,-ch*.39f,cw*.095f,indicatorPaint);c.restore();}
+
+        private void drawCar(Canvas c,float s){
+            pm.setPath(path,false);float len=pm.getLength();if(len<=0)return;
+            pm.getPosTan(len*Math.max(0f,Math.min(1f,progress)),pos,tan);
+            float angle=(float)Math.toDegrees(Math.atan2(tan[1],tan[0]))+90f;
+            c.save();c.translate(pos[0],pos[1]);c.rotate(angle);
+
+            // 30% larger than v0.9.6. Top-view crossover proportions inspired by Nissan Juke.
+            float cw=s*.0416f,ch=cw*1.72f;
+
+            // Chunky crossover tyres / wheel arches.
+            c.drawRoundRect(new RectF(-cw*.61f,-ch*.30f,-cw*.45f,-ch*.03f),cw*.06f,cw*.06f,tyrePaint);
+            c.drawRoundRect(new RectF(cw*.45f,-ch*.30f,cw*.61f,-ch*.03f),cw*.06f,cw*.06f,tyrePaint);
+            c.drawRoundRect(new RectF(-cw*.61f,ch*.08f,-cw*.45f,ch*.34f),cw*.06f,cw*.06f,tyrePaint);
+            c.drawRoundRect(new RectF(cw*.45f,ch*.08f,cw*.61f,ch*.34f),cw*.06f,cw*.06f,tyrePaint);
+
+            // Juke-like bulbous body with pronounced shoulders.
+            Path body=new Path();
+            body.moveTo(0,-ch*.52f);
+            body.cubicTo(-cw*.36f,-ch*.50f,-cw*.52f,-ch*.38f,-cw*.54f,-ch*.20f);
+            body.lineTo(-cw*.52f,ch*.27f);
+            body.cubicTo(-cw*.47f,ch*.45f,-cw*.28f,ch*.50f,0,ch*.51f);
+            body.cubicTo(cw*.28f,ch*.50f,cw*.47f,ch*.45f,cw*.52f,ch*.27f);
+            body.lineTo(cw*.54f,-ch*.20f);
+            body.cubicTo(cw*.52f,-ch*.38f,cw*.36f,-ch*.50f,0,-ch*.52f);
+            body.close();c.drawPath(body,carPaint);
+
+            // Dark lower bumper and side cladding.
+            c.drawRoundRect(new RectF(-cw*.42f,ch*.37f,cw*.42f,ch*.49f),cw*.08f,cw*.08f,carDarkPaint);
+            c.drawRoundRect(new RectF(-cw*.52f,-ch*.03f,-cw*.45f,ch*.31f),cw*.03f,cw*.03f,trimPaint);
+            c.drawRoundRect(new RectF(cw*.45f,-ch*.03f,cw*.52f,ch*.31f),cw*.03f,cw*.03f,trimPaint);
+
+            // Raised cabin / panoramic glass area.
+            c.drawRoundRect(new RectF(-cw*.34f,-ch*.24f,cw*.34f,ch*.22f),cw*.14f,cw*.14f,carDarkPaint);
+            Path windscreen=new Path();
+            windscreen.moveTo(-cw*.30f,-ch*.20f);windscreen.lineTo(cw*.30f,-ch*.20f);
+            windscreen.lineTo(cw*.25f,-ch*.05f);windscreen.lineTo(-cw*.25f,-ch*.05f);windscreen.close();c.drawPath(windscreen,glassPaint);
+            c.drawRoundRect(new RectF(-cw*.26f,ch*.02f,cw*.26f,ch*.18f),cw*.06f,cw*.06f,glassPaint);
+
+            // Distinctive split-front lighting: slim upper lamps + round lower lamps.
+            c.drawRoundRect(new RectF(-cw*.37f,-ch*.455f,-cw*.08f,-ch*.415f),cw*.03f,cw*.03f,lightPaint);
+            c.drawRoundRect(new RectF(cw*.08f,-ch*.455f,cw*.37f,-ch*.415f),cw*.03f,cw*.03f,lightPaint);
+            c.drawCircle(-cw*.31f,-ch*.335f,cw*.095f,lightPaint);
+            c.drawCircle(cw*.31f,-ch*.335f,cw*.095f,lightPaint);
+
+            // Rear boomerang-style lamps.
+            Path rl=new Path();rl.moveTo(-cw*.39f,ch*.34f);rl.lineTo(-cw*.22f,ch*.39f);rl.lineTo(-cw*.31f,ch*.31f);rl.close();c.drawPath(rl,rearLightPaint);
+            Path rr=new Path();rr.moveTo(cw*.39f,ch*.34f);rr.lineTo(cw*.22f,ch*.39f);rr.lineTo(cw*.31f,ch*.31f);rr.close();c.drawPath(rr,rearLightPaint);
+
+            boolean blink=((int)(progress*34))%2==0;
+            if(blink&&leftIndicatorOn())c.drawCircle(-cw*.43f,-ch*.39f,cw*.08f,indicatorPaint);
+            if(blink&&rightIndicatorOn())c.drawCircle(cw*.43f,-ch*.39f,cw*.08f,indicatorPaint);
+            c.restore();
+        }
     }
 }
