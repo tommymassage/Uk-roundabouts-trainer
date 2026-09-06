@@ -18,9 +18,9 @@ public class TracedSimulationActivity extends Activity {
         root.setBackgroundColor(Color.BLACK);
 
         ImageView bg = new ImageView(this);
-        bg.setImageResource(R.drawable.roundabout_template);
-        // The approved MASTER TEMPLATE is 1408 x 1056 (4:3).
-        // FIT_CENTER keeps its geometry intact instead of cropping the road layout.
+        bg.setImageResource(R.drawable.roundabout_master);
+        // Permanent approved MASTER TEMPLATE: 1536 x 1152 (4:3).
+        // FIT_CENTER preserves the exact image geometry without cropping.
         bg.setScaleType(ImageView.ScaleType.FIT_CENTER);
         root.addView(bg, new FrameLayout.LayoutParams(-1,-1));
 
@@ -88,7 +88,7 @@ public class TracedSimulationActivity extends Activity {
     private Switch toggle(String s,boolean checked){Switch sw=new Switch(this);sw.setText(s);sw.setTextColor(Color.WHITE);sw.setChecked(checked);return sw;}
 
     static final class TracedOverlay extends View {
-        private static final float MASTER_ASPECT = 1408f / 1056f;
+        private static final float MASTER_ASPECT = 1536f / 1152f;
         private final Paint routePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint carPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -160,7 +160,6 @@ public class TracedSimulationActivity extends Activity {
             path.reset();
             if(p.length<2 || imageRect.isEmpty()) return;
             path.moveTo(mapX(p[0][0]),mapY(p[0][1]));
-            // Very light midpoint smoothing only: the user's trace remains the route source of truth.
             for(int i=1;i<p.length-1;i++){
                 float x=mapX(p[i][0]), y=mapY(p[i][1]);
                 float mx=mapX((p[i][0]+p[i+1][0])*.5f);
