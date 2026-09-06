@@ -10,6 +10,7 @@ import android.view.animation.LinearInterpolator;
 import android.widget.*;
 import android.content.Context;
 import android.widget.AdapterView;
+import java.util.Random;
 
 public class TemplatePreviewActivity extends Activity {
     @Override public void onCreate(Bundle b) {
@@ -38,8 +39,8 @@ public class TemplatePreviewActivity extends Activity {
         scroll.addView(panel);
         root.addView(scroll, new LinearLayout.LayoutParams(0, -1, 2));
 
-        panel.addView(label("UK ROUNDABOUTS TRAINER  v0.7.6", 24, true));
-        TextView sub = label("GUIDED • PRACTICE • TEST", 14, true);
+        panel.addView(label("UK ROUNDABOUTS TRAINER  v0.7.7", 24, true));
+        TextView sub = label("GUIDED • PRACTICE • TEST • RANDOM CHALLENGE", 14, true);
         sub.setPadding(0, 6, 0, 14);
         panel.addView(sub);
 
@@ -68,6 +69,14 @@ public class TemplatePreviewActivity extends Activity {
         Spinner signal = spinner(new String[]{"No signal", "Signal left", "Signal right"});
         panel.addView(signal);
 
+        panel.addView(label("Your speed on approach", 13, true));
+        Spinner speed = spinner(new String[]{"Controlled / ready to stop", "Too fast"});
+        panel.addView(speed);
+
+        panel.addView(label("At the give-way line", 13, true));
+        Spinner decision = spinner(new String[]{"Wait / check for a safe gap", "Go without waiting"});
+        panel.addView(decision);
+
         CheckBox routeToggle = new CheckBox(this);
         routeToggle.setText("Show training route");
         routeToggle.setChecked(true);
@@ -78,12 +87,20 @@ public class TemplatePreviewActivity extends Activity {
         laneGuideToggle.setChecked(true);
         panel.addView(laneGuideToggle);
 
+        Button random = new Button(this);
+        random.setText("🎲  RANDOM TEST CHALLENGE");
+        panel.addView(random, new LinearLayout.LayoutParams(-1, 56));
+
         Button start = new Button(this);
-        start.setText("▶  START DRIVING DEMO");
+        start.setText("▶  START DRIVING");
         panel.addView(start, new LinearLayout.LayoutParams(-1, 58));
 
+        TextView scenario = label("Scenario: choose your setup", 13, true);
+        scenario.setPadding(0, 12, 0, 3);
+        panel.addView(scenario);
+
         TextView stage = label("Ready • MIRRORS", 17, true);
-        stage.setPadding(0, 14, 0, 5);
+        stage.setPadding(0, 8, 0, 5);
         panel.addView(stage);
         ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(100);
@@ -99,11 +116,12 @@ public class TemplatePreviewActivity extends Activity {
         rule.setPadding(0, 14, 0, 0);
         panel.addView(rule);
 
-        overlay.listener = (text, value, done, score, message) -> {
+        overlay.listener = (text, value, done, scoreValue, message, serious) -> {
             stage.setText(text);
             progress.setProgress(value);
             if (done) {
-                result.setText("Training result: " + score + "/100");
+                String grade = scoreValue >= 90 ? "Excellent" : scoreValue >= 75 ? "Good" : scoreValue >= 60 ? "Needs practice" : "Review required";
+                result.setText("Training result: " + scoreValue + "/100 • " + grade + (serious ? " • SERIOUS FAULT" : ""));
                 feedback.setText(message);
             }
         };
@@ -115,6 +133,8 @@ public class TemplatePreviewActivity extends Activity {
             overlay.trafficMode = traffic.getSelectedItemPosition();
             overlay.chosenLane = lane.getSelectedItemPosition();
             overlay.chosenSignal = signal.getSelectedItemPosition();
+            overlay.chosenSpeed = speed.getSelectedItemPosition();
+            overlay.giveWayDecision = decision.getSelectedItemPosition();
             overlay.showRoute = routeToggle.isChecked() && overlay.mode != 2;
             overlay.showLaneGuide = laneGuideToggle.isChecked() && overlay.mode != 2;
             overlay.reset();
@@ -122,6 +142,7 @@ public class TemplatePreviewActivity extends Activity {
             progress.setProgress(0);
             result.setText("Training result: —");
             feedback.setText(overlay.mode == 2 ? "Test mode: route and lane guide are hidden." : "Choose a route and press START.");
+            scenario.setText("Scenario: " + approach.getSelectedItem() + " → " + exit.getSelectedItem() + " • " + traffic.getSelectedItem());
         };
 
         AdapterView.OnItemSelectedListener select = new AdapterView.OnItemSelectedListener() {
@@ -134,8 +155,26 @@ public class TemplatePreviewActivity extends Activity {
         traffic.setOnItemSelectedListener(select);
         lane.setOnItemSelectedListener(select);
         signal.setOnItemSelectedListener(select);
+        speed.setOnItemSelectedListener(select);
+        decision.setOnItemSelectedListener(select);
         routeToggle.setOnCheckedChangeListener((b, checked) -> sync.run());
         laneGuideToggle.setOnCheckedChangeListener((b, checked) -> sync.run());
+
+        Random rng = new Random();
+        random.setOnClickListener(v -> {
+            mode.setSelection(2);
+            approach.setSelection(rng.nextInt(4));
+            exit.setSelection(rng.nextInt(3));
+            traffic.setSelection(rng.nextInt(3));
+            lane.setSelection(rng.nextInt(2));
+            signal.setSelection(rng.nextInt(3));
+            speed.setSelection(rng.nextInt(2));
+            decision.setSelection(rng.nextInt(2));
+            routeToggle.setChecked(false);
+            laneGuideToggle.setChecked(false);
+            sync.run();
+            feedback.setText("Random test ready. Check the scenario, make your choices, then press START.");
+        });
         start.setOnClickListener(v -> { sync.run(); overlay.start(); });
 
         setContentView(root);
@@ -156,7 +195,7 @@ public class TemplatePreviewActivity extends Activity {
         return v;
     }
 
-    interface StageListener { void onStage(String text, int progress, boolean done, int score, String message); }
+    interface StageListener { void onStage(String text, int progress, boolean done, int score, String message, boolean serious); }
 
     static class TrainingOverlay extends View {
         final Paint routeShadow = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -167,6 +206,7 @@ public class TemplatePreviewActivity extends Activity {
         final Paint trafficPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         final Paint traffic2Paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         final Paint amberPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        final Paint stopPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         final Path route = new Path();
         final Path trafficPath = new Path();
         final PathMeasure measure = new PathMeasure();
@@ -174,7 +214,7 @@ public class TemplatePreviewActivity extends Activity {
         final float[] tan = new float[2];
 
         boolean showRoute = true, showLaneGuide = true;
-        int mode = 0, trafficMode = 0, approach = 0, exit = 2, chosenLane = 0, chosenSignal = 0;
+        int mode = 0, trafficMode = 0, approach = 0, exit = 2, chosenLane = 0, chosenSignal = 0, chosenSpeed = 0, giveWayDecision = 0;
         float raw = 0f, progress = 0f, trafficProgress = .05f;
         ValueAnimator animator;
         StageListener listener;
@@ -187,6 +227,7 @@ public class TemplatePreviewActivity extends Activity {
             laneGuide.setColor(Color.argb(200, 70, 160, 255)); laneGuide.setStyle(Paint.Style.STROKE); laneGuide.setStrokeCap(Paint.Cap.ROUND);
             carPaint.setColor(Color.rgb(30, 103, 225)); glassPaint.setColor(Color.rgb(185, 228, 255));
             trafficPaint.setColor(Color.rgb(210, 52, 52)); traffic2Paint.setColor(Color.rgb(245, 145, 35)); amberPaint.setColor(Color.rgb(255, 175, 35));
+            stopPaint.setColor(Color.argb(210, 225, 40, 40)); stopPaint.setStyle(Paint.Style.STROKE); stopPaint.setStrokeWidth(5f);
         }
 
         void reset() {
@@ -204,7 +245,8 @@ public class TemplatePreviewActivity extends Activity {
                 raw = (float)a.getAnimatedValue();
                 trafficProgress = (raw * 1.18f + .04f) % 1f;
                 float holdStart=.22f, holdEnd=trafficMode==1?.43f:.57f;
-                if (trafficMode==0) progress=raw;
+                boolean shouldWait = trafficMode > 0;
+                if (!shouldWait) progress=raw;
                 else if (raw<holdStart) progress=raw/holdStart*.18f;
                 else if (raw<holdEnd) progress=.18f;
                 else progress=.18f+(raw-holdEnd)/(1f-holdEnd)*.82f;
@@ -216,17 +258,29 @@ public class TemplatePreviewActivity extends Activity {
 
         int expectedSignal() { return exit==1 ? 1 : exit==3 ? 2 : 0; }
         int expectedLane() { return exit==3 ? 1 : 0; }
+        boolean seriousFault() { return trafficMode>0 && giveWayDecision==1; }
+
         int score() {
             int s=100;
-            if (chosenSignal!=expectedSignal()) s-=25;
-            if (chosenLane!=expectedLane()) s-=25;
-            return s;
+            if (chosenSignal!=expectedSignal()) s-=20;
+            if (chosenLane!=expectedLane()) s-=20;
+            if (chosenSpeed!=0) s-=20;
+            if (trafficMode>0 && giveWayDecision!=0) s-=40;
+            if (trafficMode==0 && giveWayDecision==1) s-=10;
+            return Math.max(0,s);
         }
+
         String feedback() {
             StringBuilder b=new StringBuilder();
-            if (chosenSignal==expectedSignal()) b.append("Approach signal: good. "); else b.append("Check your approach signal for this exit. ");
-            if (chosenLane==expectedLane()) b.append("Lane choice: good. "); else b.append("Review lane choice; always follow signs and road markings. ");
-            if (trafficMode>0) b.append("You waited for circulating traffic from the right.");
+            b.append(chosenSignal==expectedSignal()?"Signal: good. ":"Signal: review the approach signal for this exit. ");
+            b.append(chosenLane==expectedLane()?"Lane: good. ":"Lane: review positioning and follow signs/markings. ");
+            b.append(chosenSpeed==0?"Speed: controlled. ":"Speed: too fast for a safe roundabout approach. ");
+            if (trafficMode>0) {
+                if (giveWayDecision==0) b.append("Give-way decision: correct — waited for a safe gap.");
+                else b.append("Give-way decision: serious fault — entered when circulating traffic had priority.");
+            } else {
+                b.append(giveWayDecision==0?"Observation: good — checked before entering.":"Observation: do not commit without checking for a safe gap.");
+            }
             return b.toString();
         }
 
@@ -237,13 +291,13 @@ public class TemplatePreviewActivity extends Activity {
             else if(raw<.22f)s=exit==1?"2/6 • SIGNAL LEFT":exit==3?"2/6 • SIGNAL RIGHT":"2/6 • SIGNAL normally none";
             else if(raw<.32f)s="3/6 • POSITION • " + (expectedLane()==0?"LEFT LANE":"RIGHT LANE");
             else if(trafficMode>0 && progress<=.181f)s="4/6 • SPEED • WAIT • GIVE WAY TO RIGHT";
-            else if(raw<.58f)s="4/6 • SPEED • prepare to enter";
-            else if(raw<.70f)s="5/6 • LOOK RIGHT • safe gap";
+            else if(raw<.58f)s=chosenSpeed==0?"4/6 • SPEED • controlled approach":"4/6 • SPEED • TOO FAST";
+            else if(raw<.70f)s="5/6 • LOOK RIGHT • assess the gap";
             else if(raw<.88f)s="ON ROUNDABOUT • lane discipline";
             else if(raw<.98f)s="6/6 • SIGNAL LEFT • EXIT";
             else s="COMPLETE • safe exit";
             boolean done=raw>=.995f;
-            listener.onStage(s,Math.round(raw*100),done,score(),feedback());
+            listener.onStage(s,Math.round(raw*100),done,score(),feedback(),seriousFault());
         }
 
         float X(float l,float s,float n){return l+s*n;} float Y(float t,float s,float n){return t+s*n;}
@@ -306,6 +360,9 @@ public class TemplatePreviewActivity extends Activity {
                     float p2=(trafficProgress+.34f)%1f; measure.getPosTan(measure.getLength()*p2,pos,tan); drawCar(c,s,traffic2Paint,false);
                     float p3=(trafficProgress+.67f)%1f; measure.getPosTan(measure.getLength()*p3,pos,tan); drawCar(c,s,trafficPaint,false);
                 }
+            }
+            if(trafficMode>0 && progress<=.181f && raw>.22f && raw<.58f){
+                c.drawCircle(X(l,s,chosenLane==0?.435f:.565f),Y(t,s,.675f),s*.035f,stopPaint);
             }
             c.restore();
         }
